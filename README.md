@@ -18,6 +18,15 @@
 
 This is a smart room management assistant that integrates air quality monitoring, occupancy detection, and HomeKit control capabilities.
 
+## 裝置展示
+
+### 實體裝置
+![RoomAssist 裝置照片](img/IMG_9730.jpeg)
+
+### 硬體接線圖
+![硬體接線圖](img/HWV30B.jpg)
+
+
 ## Console
 
 The prompt `esp32>` would appear on the serial console. Enter `help` to see all the available commands & their usage in the emulator.
