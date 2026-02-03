@@ -1,0 +1,38 @@
+menu "Example Configuration"
+
+    config EXAMPLE_USE_HARDCODED_SETUP_CODE
+        bool "Use hard-coded setup code"
+        default y
+        help
+            HomeKit does not recommend having the setup code programmed in the accessory as is.
+            Instead, it expects setup info (salt-verifier pair) generated for the given setup code.
+            Use this option only for testing purposes. For production, the setup info should be
+            used.
+
+    config EXAMPLE_SETUP_CODE
+        string "HomeKit Setup Code"
+        default "111-22-333"
+        depends on EXAMPLE_USE_HARDCODED_SETUP_CODE
+        help
+            Setup code to be used for HomeKot pairing, if hard-coded setup code is enabled.
+
+    config EXAMPLE_SETUP_ID
+        string "HomeKit Setup Id"
+        default "ES32"
+        depends on EXAMPLE_USE_HARDCODED_SETUP_CODE
+        help
+            Setup id to be used for HomeKot pairing, if hard-coded setup code is enabled.
+
+endmenu
+
+menu "Air Quality Sensor"
+
+    config SGP41_ENABLE
+        bool "Use Sensirion SGP41 as the air quality source"
+        default n
+        help
+            Enable this option to replace the analog MQ135 gas sensor readings with the
+            digital measurements provided by an SGP41 module connected over I2C.
+            Note: SGP41 now shares the I2C bus (Port 0) with the OLED display.
+
+endmenu

@@ -1,0 +1,1289 @@
+<!doctype html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ESP32 Controller</title>
+  <script>
+    document.title = window.location.hostname || "ESP32 Controller";
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    #OTAprogress-bar {
+      width: 100%;
+      background-color: #f3f3f3;
+      border: 1px solid #ccc;
+    }
+
+    #OTAprogress {
+      width: 0;
+      height: 30px;
+      background-color: #4caf50;
+      text-align: center;
+      line-height: 30px;
+      color: white;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    button:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+    }
+
+    .Counterbar-container {
+      width: 100%;
+      background-color: #f3f3f3;
+      border: 1px solid #ccc;
+      position: relative;
+      height: 30px;
+    }
+
+    .Counterbar {
+      height: 100%;
+      background-color: #4caf50;
+      text-align: center;
+      color: black;
+      line-height: 30px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+    }
+
+    th,
+    td {
+      border: 1px solid #ddd;
+      padding: 8px;
+    }
+
+    th {
+      background-color: #4caf50;
+      color: white;
+    }
+
+    tr:nth-child(even) {
+      background-color: #f2f2f2;
+    }
+
+    tr:hover {
+      background-color: #ddd;
+    }
+
+    #title,
+    #test {
+      font-weight: bold;
+    }
+
+    #title {
+      background-color: #4caf50;
+      color: white;
+      padding: 5px;
+      text-align: center;
+    }
+
+    #test {
+      background-color: #2196F3;
+      color: white;
+      padding: 5px;
+      text-align: center;
+    }
+
+    .section {
+      background-color: #e0f7fa;
+      margin-bottom: 20px;
+      padding: 10px;
+      border-radius: 5px;
+    }
+
+    .section-result {
+      background-color: #ffe0b2;
+      margin-bottom: 20px;
+      padding: 10px;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="app" class="hidden">
+    Build Version: {{ sysBuildversion }} ({{ sysBuildTime }})<br>
+    Artificial Neural Network Model: Feedforward Neural Network <br>
+    Temperature: {{ dht22currenttemp }} (°C) Humidity: {{ dht22currenthumi }} (%)<br>
+    <div v-if="showAirQuality">
+      Air Quality (VOC):
+      <span v-if="mq135currentdata == -1" style="color: red;">Sensor Error</span>
+      <span v-else>{{ mq135currentdata }} (Limit >= {{ mq135thresholdhigh }})</span>
+      <br>
+
+      <span v-if="sgp41nox !== undefined">
+        NOx Index:
+        <span v-if="sgp41nox == -1" style="color: red;">Sensor Error</span>
+        <span v-else>{{ sgp41nox }} (Smoke >= {{ sgp41noxhigh }})</span>
+      </span>
+      <br>
+    </div>
+
+    <div class="section">
+      <h3>History</h3>
+      <canvas id="EnvironmentChart"></canvas>
+      <h3>Artificial Neural Network</h3>
+      <canvas id="NULD2410Chart"></canvas>
+    </div>
+
+    <div class="section">
+      <table v-if="!isFirmwareUpgrading && !isRebooting" width="300" border="0">
+        <tbody>
+          <tr>
+            <td>Auto Learning&nbsp;</td>
+          </tr>
+          <tr>
+            <td>
+              <button @click="fetchData(101)" :disabled="isResetDisabled">Reset</button>
+              <button @click="fetchData(104)" :disabled="isSaveDisabled">Save</button>
+              <button @click="downloadWeights()">Download</button>
+              <input type="file" ref="weightsFile" @change="uploadWeights" accept=".json" style="display:none">
+              <button @click="$refs.weightsFile.click()">Upload</button>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <button v-if="showStillButton" @click="fetchData(203)" :disabled="isLearnStillDisabled">Stillness</button>
+              <button v-if="showSoBodyButton" @click="fetchData(201)" :disabled="isLearnSoBodyDisabled">Someone</button>
+              <button v-if="showNoBodyButton" @click="fetchData(202)" :disabled="isLearnNoBodyDisabled">Noone</button>
+              <button v-if="showStopButton" @click="fetchData(204)" :disabled="isStopDisabled">Stop</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <table v-if="!isFirmwareUpgrading && !isRebooting" width="300" border="0">
+        <tbody>
+          <tr>
+            <td>System Functions&nbsp;</td>
+          </tr>
+          <tr>
+            <td>
+              <button v-if="!isFirmwareUpgrading" @click="fetchData(401)" :disabled="isFirmwareUpgradeDisabled">Firmware
+                Upgrade</button>
+              <button v-if="!isFirmwareUpgrading" @click="fetchData(501)" :disabled="isRebootDisabled">Reboot</button>
+              <button @click="fetchData(502)" :disabled="isFirmwareUpgrading || isEraseDataDisabled">Erase Data</button>
+              <button v-if="showAirQuality" @click="fetchData(602)">Reset Base</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section" v-show="showConfig">
+      <form @submit.prevent="submitForm">
+        <label for="firmwareIp">Firmware Server:</label>
+        <input type="text" v-model="form.firmwareIp" id="firmwareIp">:8443/
+        <input type="text" v-model="form.firmwareFilename" id="firmwareFilename"><br><br>
+
+        <label for="ThingSpeak">ThingSpeak APIKEY</label>
+        <input type="text" v-model="form.apikey" id="apikey"><br><br>
+
+        <label for="mq135">VOC Threshold:<br> High</label>
+        <input type="number" v-model="form.mq135high" id="mq135high"> <br> Low
+        <input type="number" v-model="form.mq135low" id="mq135low"> <br><br>
+
+        <label for="sgp41nox">NOx Threshold:<br> High</label>
+        <input type="number" v-model="form.sgp41noxhigh" id="sgp41noxhigh"> <br> Low
+        <input type="number" v-model="form.sgp41noxlow" id="sgp41noxlow"> <br><br>
+
+        <label for="dht22temp">Temperature Threshold:<br> High</label>
+        <input type="number" v-model="form.temphigh" id="temphigh"> (°C)<br> Low
+        <input type="number" v-model="form.templow" id="templow"> (°C)<br><br>
+
+        <label for="dht22humi">Humidity Threshold:<br> High</label>
+        <input type="number" v-model="form.humihigh" id="humihigh"> (%)<br> Low
+        <input type="number" v-model="form.humilow" id="humilow"> (%)<br><br>
+
+        <label for="OLED">LED ECO:<br> Display Time</label>
+        <input type="number" v-model="form.leddisplay" id="leddisplay"> (sec.)<br> Snooze Time
+        <input type="number" v-model="form.ledsnooze" id="ledsnooze"> (sec.)<br><br>
+
+        <label for="syslogIp">Syslog IP:</label>
+        <input type="text" v-model="form.syslogIp" id="syslogIp"><br><br>
+
+        <label for="RLOG">Remote Log Status:</label>
+        <table>
+          <tr>
+            <td>Function</td>
+            <td>Debug</td>
+            <td>Info</td>
+            <td>Warning</td>
+            <td>Alert</td>
+            <td>Error</td>
+          </tr>
+          <tr>
+            <td>
+              <select id="facility" multiple v-model="form.facilities" @change="updateLevelsByFacility">
+                <option value="0">AirQuality</option>
+                <option value="1">ANN</option>
+                <option value="2">Elf</option>
+                <option value="3">Homekit</option>
+                <option value="4">HTTP</option>
+                <option value="5">Humidity</option>
+                <option value="6">IR</option>
+                <option value="7">MAX9814</option>
+                <option value="8">Occupancy</option>
+                <option value="9">OLED</option>
+                <option value="10">OTA</option>
+                <option value="11">RMT</option>
+                <option value="12">SNTP</option>
+                <option value="13">Syslog</option>
+                <option value="14">System</option>
+                <option value="15">Telnet</option>
+                <option value="16">Temperature</option>
+                <option value="17">ThingSpeak</option>
+                <option value="18">Web</option>
+              </select>
+            </td>
+            <td><input type="checkbox" id="level0" v-model="form.level0" @change="updateLocalLogLevel"></td>
+            <td><input type="checkbox" id="level1" v-model="form.level1" @change="updateLocalLogLevel"></td>
+            <td><input type="checkbox" id="level2" v-model="form.level2" @change="updateLocalLogLevel"></td>
+            <td><input type="checkbox" id="level3" v-model="form.level3" @change="updateLocalLogLevel"></td>
+            <td><input type="checkbox" id="level4" v-model="form.level4" @change="updateLocalLogLevel"></td>
+          </tr>
+        </table>
+
+        <button type="submit">Submit</button>
+      </form>
+    </div>
+
+    <div class="section-result" v-show="showAutoLearning">
+      <table v-if="!isFirmwareUpgrading && !isRebooting" width="300" border="0">
+        <tbody>
+          <tr>
+            <td>Auto Learning Input</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section-result" v-show="showOTAProgressBar">
+      <table width="300" border="0">
+        <tbody>
+          <tr>
+            <td>Firmware Upgrade Progress</td>
+          </tr>
+          <tr>
+            <td>
+              <div id="OTAprogress-bar">
+                <div id="OTAprogress"
+                  :style="{ width: otaPercent + '%', backgroundColor: getColorForPercentage(otaPercent)}">
+                  {{ otaPercent >= 100 ? otaPercentText : otaPercentText }}
+                </div>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    new Vue({
+      el: '#app',
+      data: {
+        sysBuildversion: '',
+        sysBuildTime: '',
+        sysMacaddress: '',
+        sysIPaddress: '',
+        sysOffthreshold: 0,
+        mq135currentdata: 0,
+        sgp41nox: undefined,
+        mq135thresholdhigh: 0,
+        mq135thresholdlow: 0,
+        sgp41noxhigh: 0,
+        sgp41noxlow: 0,
+        deltafanscheduler: [],
+        airQualityData: [],
+        airQualityLabels: [],
+        sgp41noxData: [],
+        NULD2410Labels: [],
+        dht22currenttemp: 0,
+        dht22thresholdtemphigh: 0,
+        dht22thresholdtemplow: 0,
+        dht22currenthumi: 0,
+        dht22thresholdhumihigh: 0,
+        dht22thresholdhumilow: 0,
+        nuld2410pred: 0,
+        nuld2410new: 0,
+        nuld2410predData: [],
+        temperatureData: [],
+        humidityData: [],
+        syslogstatus: [],
+        sysResetstatus: 0,
+        sysDisplaySsatus: 0,
+        sysSavestatus: 0,
+        sysLearnstillnessstatus: 0,
+        sysLearnsomebodystatus: 0,
+        sysLearnnobodystatus: 0,
+        sysDebugsomebodystatus: 0,
+        sysDebugnobodystatus: 0,
+        sysFirmwareupgradestatus: 0,
+        sysRebootstatus: 0,
+        sysErasestatus: 0,
+        bottonTextDisplay: '',
+        otaPercent: 0,
+        otaPercentText: '0%',
+        otaInterval: null,
+        otaCountdown: 0,
+        displayInterval: null,
+        showAutoLearning: false,
+        showNoBodyButton: true,
+        showSoBodyButton: true,
+        showStillButton: true,
+        showStopButton: false,
+        showDis1: true,
+        showOTAProgressBar: false,
+        showConfig: true,
+        isFirmwareUpgrading: false,
+        isRebooting: false,
+        isResetDisabled: false,
+        isDisplayDisabled: false,
+        isSaveDisabled: true,
+        isLearnStillDisabled: true,
+        isLearnSoBodyDisabled: false,
+        isLearnNoBodyDisabled: false,
+        isStopDisabled: true,
+        isDebugSomebodyDisabled: false,
+        isDebugNobodyDisabled: false,
+        isDebugOffDisabled: true,
+        isFirmwareUpgradeDisabled: false,
+        isRebootDisabled: false,
+        isEraseDataDisabled: false,
+        otaFailureCount: 0,
+        otaFailureThreshold: 5,
+        autolearnInterval: null,
+        selectedDoors: [],
+        form: {
+          door: '',
+          activeSensitivity: '',
+          staticSensitivity: '',
+          idelTimes: '',
+          syslogIp: '',
+          firmwareIp: '',
+          firmwareFilename: '',
+          apikey: '',
+          mq135high: '',
+          mq135low: '',
+          sgp41noxhigh: '',
+          sgp41noxlow: '',
+          temphigh: '',
+          templow: '',
+          humihigh: '',
+          humilow: '',
+          leddisplay: '',
+          ledsnooze: '',
+          facilities: [],
+          facility: '',
+          level0: false,
+          level1: false,
+          level2: false,
+          level3: false,
+          level4: false
+        }
+      },
+      computed: {
+        showAirQuality() {
+          return this.mq135thresholdhigh !== 0 || this.mq135thresholdlow !== 0 || this.mq135currentdata !== 0;
+        }
+      },
+      mounted() {
+        if (this.$el) {
+          this.$el.classList.remove('hidden');
+        }
+        this.fetchData(1);
+        this.initChart();
+        this.updateInterval = setInterval(this.updateAirQuality, 1500);
+        this.updateLearnInterval = setInterval(this.updateNULD2410, 1500);
+      },
+      beforeDestroy() {
+        clearInterval(this.updateInterval);
+        clearInterval(this.updateLearnInterval);
+      },
+      methods: {
+        initChart() {
+          const ctxENV = document.getElementById("EnvironmentChart").getContext("2d");
+          this.ENVchart = new Chart(ctxENV, {
+            type: "line",
+            data: {
+              labels: [],
+              datasets: [
+                {
+                  label: "Temperature (°C)",
+                  data: [],
+                  borderColor: "#f44336",
+                  backgroundColor: "rgba(244,67,54,0.2)",
+                  tension: 0.4,
+                  fill: true
+                },
+                {
+                  label: "Air Quality",
+                  data: [],
+                  borderColor: "#ff9800",
+                  backgroundColor: "rgba(255,152,0,0.2)",
+                  tension: 0.4,
+                  fill: true
+                },
+                {
+                  label: "Humidity (%)",
+                  data: [],
+                  borderColor: "#2196F3",
+                  backgroundColor: "rgba(33,150,243,0.2)",
+                  fill: true
+                },
+                {
+                  label: "NOx Index",
+                  data: [],
+                  borderColor: "#9C27B0",
+                  backgroundColor: "rgba(156, 39, 176, 0.2)",
+                  tension: 0.4,
+                  fill: true
+                }
+              ]
+            },
+            options: {
+              responsive: true,
+              scales: {
+                y: {
+                  beginAtZero: true
+                }
+              },
+              plugins: {
+                legend: {
+                  display: true,
+                  position: "top"
+                }
+              }
+            },
+            plugins: [{
+              afterDatasetsDraw: (chart, args, pluginOptions) => {
+                const { ctx, chartArea: { top, left, width } } = chart;
+                ctx.save();
+                const right = left + width;
+                ctx.font = "12px Arial";
+                ctx.fillStyle = "#555";
+                ctx.textAlign = "right";
+                const fanFlags = this.deltafanscheduler || [];
+                const statusList = [];
+                if (fanFlags[0] === 2) statusList.push("Manual");
+                if (fanFlags[1] === 2) statusList.push("Exhaust");
+                if (fanFlags[2] === 2) statusList.push("Warm");
+                if (fanFlags[3] === 2) statusList.push("Dry");
+                if (fanFlags[4] === 2) statusList.push("HomeKit");
+                const displayText = "Fan Status: " + (statusList.length > 0 ? statusList.join(", ") : "Off");
+                ctx.fillText(displayText, right - 10, top + 20);
+                ctx.restore();
+              }
+            }]
+          });
+
+          const ctxNULD2410 = document.getElementById("NULD2410Chart").getContext("2d");
+          this.NULD2410chart = new Chart(ctxNULD2410, {
+            type: "bar",
+            data: {
+              labels: [],
+              datasets: [
+                {
+                  label: "Prediction",
+                  data: [],
+                  backgroundColor: [],
+                  borderWidth: 1
+                }
+              ]
+            },
+            options: {
+              responsive: true,
+              scales: {
+                x: { title: { display: true, text: "Time" } },
+                y: { title: { display: true, text: "Value" }, min: 0, max: 1 }
+              }
+            }
+          });
+        },
+        updateAirQuality() {
+          this.fetchData(601);
+          const now = new Date().toLocaleTimeString();
+          this.temperatureData.push(this.dht22currenttemp);
+          this.humidityData.push(this.dht22currenthumi);
+          this.airQualityData.push(this.mq135currentdata);
+          this.sgp41noxData.push(this.sgp41nox || 0);
+          this.airQualityLabels.push(now);
+          if (this.humidityData.length > 80) {
+            this.airQualityData.shift();
+            this.sgp41noxData.shift();
+            this.temperatureData.shift();
+            this.humidityData.shift();
+            this.airQualityLabels.shift();
+          }
+          this.ENVchart.data.labels = this.airQualityLabels;
+
+          const targetDatasets = [];
+
+          // 1. Temperature
+          targetDatasets.push({
+            label: "Temperature (°C)",
+            data: this.temperatureData,
+            borderColor: "#f44336",
+            backgroundColor: "rgba(244,67,54,0.2)",
+            tension: 0.4,
+            fill: true
+          });
+
+          // 2. Air Quality (Conditional)
+          if (this.showAirQuality) {
+            targetDatasets.push({
+              label: "Air Quality",
+              data: this.airQualityData,
+              borderColor: "#ff9800",
+              backgroundColor: "rgba(255,152,0,0.2)",
+              tension: 0.4,
+              fill: true
+            });
+          }
+
+          // 3. Humidity
+          targetDatasets.push({
+            label: "Humidity (%)",
+            data: this.humidityData,
+            borderColor: "#2196F3",
+            backgroundColor: "rgba(33,150,243,0.2)",
+            fill: true
+          });
+
+          // 4. NOx (Conditional)
+          if (this.showAirQuality && this.sgp41nox !== undefined) {
+            targetDatasets.push({
+              label: "NOx Index",
+              data: this.sgp41noxData,
+              borderColor: "#9C27B0",
+              backgroundColor: "rgba(156, 39, 176, 0.2)",
+              tension: 0.4,
+              fill: true
+            });
+          }
+
+          // Check if structure matches
+          const currentDatasets = this.ENVchart.data.datasets;
+          let match = true;
+          if (currentDatasets.length !== targetDatasets.length) {
+            match = false;
+          } else {
+            for (let i = 0; i < currentDatasets.length; i++) {
+              if (currentDatasets[i].label !== targetDatasets[i].label) {
+                match = false;
+                break;
+              }
+            }
+          }
+
+          if (match) {
+            // Update data only to preserve animation
+            for (let i = 0; i < currentDatasets.length; i++) {
+              currentDatasets[i].data = targetDatasets[i].data;
+            }
+          } else {
+            // Rebuild structure
+            this.ENVchart.data.datasets = targetDatasets;
+          }
+
+          this.ENVchart.update();
+        },
+        updateNULD2410() {
+          this.fetchData(601);
+          const now = new Date().toLocaleTimeString();
+          this.nuld2410predData.push(this.nuld2410pred);
+          this.NULD2410Labels.push(now);
+          if (this.nuld2410predData.length > 80) {
+            this.nuld2410predData.shift();
+            this.NULD2410Labels.shift();
+          }
+          this.NULD2410chart.data.labels = this.NULD2410Labels;
+          this.NULD2410chart.data.datasets[0].data = this.nuld2410predData;
+          this.NULD2410chart.data.datasets[0].backgroundColor = this.nuld2410predData.map(value => {
+            const hue = 240 + (120 * value);
+            return `hsl(${hue}, 100%, 40%)`;
+          });
+          this.NULD2410chart.update();
+        },
+        applyLearnStatus() {
+          if (this.sysLearnstillnessstatus) {
+            this.showAutoLearning = false;
+            this.showOTAProgressBar = false;
+            this.showStillButton = true;
+            this.showSoBodyButton = false;
+            this.showNoBodyButton = false;
+            this.showStopButton = true;
+            this.isLearnStillDisabled = true;
+            this.isLearnSoBodyDisabled = false;
+            this.isLearnNoBodyDisabled = false;
+            this.isStopDisabled = false;
+            return;
+          }
+          if (this.sysLearnsomebodystatus) {
+            this.showAutoLearning = false;
+            this.showOTAProgressBar = false;
+            this.showStillButton = false;
+            this.showSoBodyButton = true;
+            this.showNoBodyButton = false;
+            this.showStopButton = true;
+            this.isLearnStillDisabled = false;
+            this.isLearnSoBodyDisabled = true;
+            this.isLearnNoBodyDisabled = false;
+            this.isStopDisabled = false;
+            return;
+          }
+          if (this.sysLearnnobodystatus) {
+            this.showAutoLearning = false;
+            this.showOTAProgressBar = false;
+            this.showStillButton = false;
+            this.showSoBodyButton = false;
+            this.showNoBodyButton = true;
+            this.showStopButton = true;
+            this.isLearnStillDisabled = false;
+            this.isLearnSoBodyDisabled = false;
+            this.isLearnNoBodyDisabled = true;
+            this.isStopDisabled = false;
+            return;
+          }
+          this.showStillButton = true;
+          this.showSoBodyButton = true;
+          this.showNoBodyButton = true;
+          this.showStopButton = false;
+          this.isLearnStillDisabled = false;
+          this.isLearnSoBodyDisabled = false;
+          this.isLearnNoBodyDisabled = false;
+          this.isStopDisabled = true;
+        },
+        restoreIdleControls() {
+          if (this.otaInterval) {
+            clearInterval(this.otaInterval);
+            this.otaInterval = null;
+          }
+          this.isFirmwareUpgrading = false;
+          this.isRebooting = false;
+          this.otaFailureCount = 0;
+          this.isResetDisabled = false;
+          this.isDisplayDisabled = false;
+          this.isSaveDisabled = !this.nuld2410new;
+          this.isLearnStillDisabled = false;
+          this.isLearnSoBodyDisabled = false;
+          this.isLearnNoBodyDisabled = false;
+          this.isStopDisabled = true;
+          this.isDebugSomebodyDisabled = false;
+          this.isDebugNobodyDisabled = false;
+          this.isDebugOffDisabled = true;
+          this.isFirmwareUpgradeDisabled = false;
+          this.isRebootDisabled = false;
+          this.isEraseDataDisabled = false;
+          this.showConfig = true;
+        },
+        handleOtaFailure(message = 'Firmware Upgrade failed') {
+          this.restoreIdleControls();
+          this.applyLearnStatus();
+          this.showOTAProgressBar = false;
+          this.showConfig = true;
+          this.otaPercent = 0;
+          this.otaPercentText = message;
+          this.isFirmwareUpgrading = false;
+          this.otaFailureCount = 0;
+          if (typeof window !== 'undefined' && typeof window.alert === 'function') {
+            window.alert(message);
+          }
+        },
+        processOtaProgressSample(percent, message = 'Firmware Upgrade failed') {
+          if (percent < 0) {
+            this.otaFailureCount += 1;
+            if (this.otaFailureCount >= this.otaFailureThreshold) {
+              this.handleOtaFailure(message);
+            }
+            return false;
+          }
+          this.otaFailureCount = 0;
+          return true;
+        },
+        ensureFirmwarePolling(immediate = false) {
+          if (this.otaInterval) {
+            return;
+          }
+          if (immediate) {
+            this.fetchData(402);
+          }
+          this.otaInterval = setInterval(() => {
+            this.fetchData(402);
+          }, 500);
+        },
+        fetchData(action) {
+          console.log(`Fetching data for action ${action}`);
+          fetch(`/fetchvue?action=${action}`)
+            .then(response => response.json())
+            .then(data => {
+              if (data.error) {
+                alert(data.error);
+              } else {
+                const action_type = data['action-type'];
+                const action_status = data['action-status'];
+                switch (action_type) {
+                  case 1:
+                    this.sysBuildversion = data.sysBuildversion || 'Unknown';
+                    this.sysBuildTime = data.sysBuildTime || 'Unknown';
+                    this.sysMacaddress = data.sysMacaddress || 'Unknown';
+                    this.sysIPaddress = data.sysIPaddress || 'Unknown';
+                    this.sysOffthreshold = data.sysOffthreshold || 0;
+                    this.mq135currentdata = data.mq135currentdata || 0;
+                    if (data.sgp41nox !== undefined) this.sgp41nox = data.sgp41nox;
+                    this.mq135thresholdhigh = data.mq135thresholdhigh || 0;
+                    this.mq135thresholdlow = data.mq135thresholdlow || 0;
+                    this.sgp41noxhigh = data.sgp41noxhigh || 0;
+                    this.sgp41noxlow = data.sgp41noxlow || 0;
+                    this.deltafanscheduler = data.deltafanscheduler || [];
+                    this.dht22currenttemp = data.dht22currenttemp || 0;
+                    this.dht22thresholdtemphigh = data.dht22thresholdtemphigh || 0;
+                    this.dht22thresholdtemplow = data.dht22thresholdtemplow || 0;
+                    this.dht22currenthumi = data.dht22currenthumi || 0;
+                    this.dht22thresholdhumihigh = data.dht22thresholdhumihigh || 0;
+                    this.dht22thresholdhumilow = data.dht22thresholdhumilow || 0;
+                    this.nuld2410pred = data.nuld2410pred || 0;
+                    this.nuld2410new = data.nuld2410new || 0;
+                    this.leddisplay = data.leddisplay || 0;
+                    this.ledsnooze = data.ledsnooze || 0;
+                    this.syslogstatus = Array.isArray(data.syslogstatus) ? data.syslogstatus : [];
+                    this.sysResetstatus = data.sysResetstatus || 0;
+                    this.sysDisplaySsatus = data.sysDisplaySsatus || 0;
+                    this.sysSavestatus = data.sysSavestatus || 0;
+                    this.sysLearnstillnessstatus = data.sysLearnstillnessstatus || 0;
+                    this.sysLearnsomebodystatus = data.sysLearnsomebodystatus || 0;
+                    this.sysLearnnobodystatus = data.sysLearnnobodystatus || 0;
+                    this.sysDebugsomebodystatus = data.sysDebugsomebodystatus || 0;
+                    this.sysDebugnobodystatus = data.sysDebugnobodystatus || 0;
+                    const previousUpgradeState = this.isFirmwareUpgrading;
+                    this.sysFirmwareupgradestatus = data.sysFirmwareupgradestatus || 0;
+                    this.sysRebootstatus = data.sysRebootstatus || 0;
+                    this.sysErasestatus = data.sysErasestatus || 0;
+                    const otaPercentRaw = Number(data['ota-percent'] ?? data.ota_progress ?? this.otaPercent ?? 0) || 0;
+                    const isOtaInProgress = this.sysFirmwareupgradestatus === 1;
+                    if (isOtaInProgress && !previousUpgradeState) {
+                      this.startFirmwareUpgrade();
+                    }
+                    let canUpdateOtaUi = true;
+                    if (isOtaInProgress) {
+                      canUpdateOtaUi = this.processOtaProgressSample(otaPercentRaw, 'Firmware Upgrade failed');
+                    } else {
+                      this.otaFailureCount = 0;
+                    }
+                    if (isOtaInProgress && canUpdateOtaUi) {
+                      this.isFirmwareUpgrading = true;
+                      this.showConfig = false;
+                      this.showAutoLearning = false;
+                      this.showOTAProgressBar = true;
+                      this.isFirmwareUpgradeDisabled = true;
+                      this.isRebootDisabled = true;
+                      this.isEraseDataDisabled = true;
+                      this.otaPercent = otaPercentRaw;
+                      this.otaPercentText = `${this.otaPercent}%`;
+                    } else if (!isOtaInProgress && canUpdateOtaUi && !this.isRebooting) {
+                      this.restoreIdleControls();
+                      this.showOTAProgressBar = false;
+                      this.applyLearnStatus();
+                    }
+                    this.isSaveDisabled = this.isFirmwareUpgrading ? true : !this.nuld2410new;
+                    this.applyLearnStatus();
+                    if (this.sysDisplaySsatus) {
+                      this.showConfig = false;
+                      this.showAutoLearning = true;
+                      this.showOTAProgressBar = false;
+                      this.isSaveDisabled = false;
+                    }
+                    this.form.syslogIp = data.syslogIp || this.form.syslogIp;
+                    this.form.idelTimes = String(data.sysOffthreshold || this.form.idelTimes || '');
+                    this.form.firmwareIp = data.firmwareIp || this.form.firmwareIp;
+                    this.form.firmwareFilename = data.firmwareFilename || this.form.firmwareFilename;
+                    this.form.apikey = data.apikey || this.form.apikey;
+                    this.form.mq135high = String(this.mq135thresholdhigh || this.form.mq135high || '');
+                    this.form.mq135low = String(this.mq135thresholdlow || this.form.mq135low || '');
+                    this.form.sgp41noxhigh = String(this.sgp41noxhigh || this.form.sgp41noxhigh || '');
+                    this.form.sgp41noxlow = String(this.sgp41noxlow || this.form.sgp41noxlow || '');
+                    this.form.temphigh = String(this.dht22thresholdtemphigh || this.form.temphigh || '');
+                    this.form.templow = String(this.dht22thresholdtemplow || this.form.templow || '');
+                    this.form.humihigh = String(this.dht22thresholdhumihigh || this.form.humihigh || '');
+                    this.form.humilow = String(this.dht22thresholdhumilow || this.form.humilow || '');
+                    this.form.leddisplay = String(this.leddisplay || this.form.leddisplay || '');
+                    this.form.ledsnooze = String(this.ledsnooze || this.form.ledsnooze || '');
+                    this.updateLevelsByFacility();
+                    break;
+                  case 101:
+                    this.showAutoLearning = false;
+                    this.showOTAProgressBar = false;
+                    this.showConfig = true;
+                    break;
+                  case 103:
+                    break;
+                  case 104:
+                    this.showStillButton = true;
+                    this.showNoBodyButton = true;
+                    this.showSoBodyButton = true;
+                    this.showStopButton = false;
+                    this.isLearnStillDisabled = false;
+                    this.isLearnSoBodyDisabled = false;
+                    this.isLearnNoBodyDisabled = false;
+                    this.isStopDisabled = true;
+                    break;
+                  case 201:
+                    this.showStillButton = false;
+                    this.showSoBodyButton = true;
+                    this.showNoBodyButton = false;
+                    this.showStopButton = true;
+                    this.isLearnSoBodyDisabled = true;
+                    this.isStopDisabled = false;
+                    break;
+                  case 202:
+                    this.showStillButton = false;
+                    this.showSoBodyButton = false;
+                    this.showNoBodyButton = true;
+                    this.showStopButton = true;
+                    this.isLearnNoBodyDisabled = true;
+                    this.isStopDisabled = false;
+                    break;
+                  case 203:
+                    this.showStillButton = true;
+                    this.showSoBodyButton = false;
+                    this.showNoBodyButton = false;
+                    this.showStopButton = true;
+                    this.isLearnStillDisabled = true;
+                    this.isStopDisabled = false;
+                    break;
+                  case 204:
+                    this.showStillButton = true;
+                    this.showSoBodyButton = true;
+                    this.showNoBodyButton = true;
+                    this.showStopButton = false;
+                    this.isLearnStillDisabled = false;
+                    this.isLearnSoBodyDisabled = false;
+                    this.isLearnNoBodyDisabled = false;
+                    this.isStopDisabled = true;
+                    break;
+                  case 401: {
+                    const percentStart = Number(data['ota-percent'] ?? data.ota_progress ?? this.otaPercent ?? 0) || 0;
+                    const status = Number(data.sysFirmwareupgradestatus ?? this.sysFirmwareupgradestatus ?? 0) || 0;
+                    this.sysFirmwareupgradestatus = status;
+                    if (status === 1 && !this.otaInterval) {
+                      this.startFirmwareUpgrade();
+                    }
+                    let canUpdateOtaUi401 = true;
+                    if (status === 1) {
+                      canUpdateOtaUi401 = this.processOtaProgressSample(percentStart, 'Firmware Upgrade failed');
+                    } else {
+                      this.otaFailureCount = 0;
+                    }
+                    if (status === 1 && canUpdateOtaUi401) {
+                      this.isFirmwareUpgrading = true;
+                      this.showConfig = false;
+                      this.showAutoLearning = false;
+                      this.showOTAProgressBar = true;
+                      this.isFirmwareUpgradeDisabled = true;
+                      this.isRebootDisabled = true;
+                      this.isEraseDataDisabled = true;
+                      this.otaPercent = percentStart;
+                      this.otaPercentText = `${this.otaPercent}%`;
+                    } else if (canUpdateOtaUi401 && !this.isRebooting) {
+                      this.restoreIdleControls();
+                      this.showOTAProgressBar = false;
+                      this.applyLearnStatus();
+                      this.otaPercent = Math.max(percentStart, 0);
+                      this.otaPercentText = `${this.otaPercent}%`;
+                    }
+                    break;
+                  }
+                  case 402: {
+                    const percent = Number(data['ota-percent'] ?? data.ota_progress ?? this.otaPercent ?? 0) || 0;
+                    const status = Number(data.sysFirmwareupgradestatus ?? this.sysFirmwareupgradestatus ?? 0) || 0;
+                    this.sysFirmwareupgradestatus = status;
+                    let canUpdateOtaUi402 = true;
+                    if (status === 1) {
+                      canUpdateOtaUi402 = this.processOtaProgressSample(percent, 'Firmware Upgrade failed');
+                    } else {
+                      this.otaFailureCount = 0;
+                    }
+                    if (status === 1 && canUpdateOtaUi402) {
+                      this.isFirmwareUpgrading = true;
+                      this.showConfig = false;
+                      this.showAutoLearning = false;
+                      this.showOTAProgressBar = true;
+                      this.isFirmwareUpgradeDisabled = true;
+                      this.isRebootDisabled = true;
+                      this.isEraseDataDisabled = true;
+                      this.ensureFirmwarePolling(false);
+                      this.otaPercent = percent;
+                      this.otaPercentText = `${this.otaPercent}%`;
+                      if (this.otaPercent >= 100) {
+                        this.otaPercentText = `Rebooting, Please Wait (${this.otaCountdown || 0} sec.)`;
+                      }
+                    } else if (canUpdateOtaUi402 && !this.isRebooting) {
+                      this.restoreIdleControls();
+                      this.showOTAProgressBar = false;
+                      this.applyLearnStatus();
+                      this.otaPercent = Math.max(percent, 0);
+                      if (this.otaPercent >= 100) {
+                        this.otaPercentText = `Rebooting, Please Wait (${this.otaCountdown || 0} sec.)`;
+                      } else {
+                        this.otaPercentText = `${this.otaPercent}%`;
+                      }
+                    }
+                    break;
+                  }
+                  case 501:
+                    this.isRebooting = true;
+                    this.showConfig = false;
+                    this.showAutoLearning = false;
+                    this.showOTAProgressBar = true;
+                    this.isResetDisabled = true;
+                    this.isDisplayDisabled = true;
+                    this.isSaveDisabled = true;
+                    this.isLearnStillDisabled = true;
+                    this.isLearnSoBodyDisabled = true;
+                    this.isLearnNoBodyDisabled = true;
+                    this.isStopDisabled = true;
+                    this.isDebugSomebodyDisabled = true;
+                    this.isDebugNobodyDisabled = true;
+                    this.isDebugOffDisabled = true;
+                    this.isFirmwareUpgradeDisabled = true;
+                    this.isRebootDisabled = true;
+                    this.isEraseDataDisabled = true;
+                    this.otaPercent = 100;
+                    this.otaPercentText = "Rebooting, Please Wait (15 sec.)";
+                    this.startCountdown();
+                    break;
+                  case 502:
+                    this.isEraseDataDisabled = true;
+                    this.isRebooting = true;
+                    this.showConfig = false;
+                    this.showAutoLearning = false;
+                    this.showOTAProgressBar = true;
+                    this.isResetDisabled = true;
+                    this.isDisplayDisabled = true;
+                    this.isSaveDisabled = true;
+                    this.isLearnStillDisabled = true;
+                    this.isLearnSoBodyDisabled = true;
+                    this.isLearnNoBodyDisabled = true;
+                    this.isStopDisabled = true;
+                    this.isDebugSomebodyDisabled = true;
+                    this.isDebugNobodyDisabled = true;
+                    this.isDebugOffDisabled = true;
+                    this.isFirmwareUpgradeDisabled = true;
+                    this.isRebootDisabled = true;
+                    this.otaPercent = 100;
+                    this.otaPercentText = "Erase NVS, Please Wait (15 sec.)";
+                    this.startCountdown();
+                    break;
+                  case 601: {
+                    const hasField = (key) => Object.prototype.hasOwnProperty.call(data, key);
+                    if (hasField('mq135currentdata')) {
+                      this.mq135currentdata = data.mq135currentdata;
+                    }
+                    if (hasField('sgp41nox')) {
+                      this.sgp41nox = data.sgp41nox;
+                    }
+                    if (hasField('mq135thresholdhigh')) {
+                      this.mq135thresholdhigh = data.mq135thresholdhigh;
+                    }
+                    if (hasField('mq135thresholdlow')) {
+                      this.mq135thresholdlow = data.mq135thresholdlow;
+                    }
+                    if (Array.isArray(data.deltafanscheduler)) {
+                      this.deltafanscheduler = data.deltafanscheduler;
+                    }
+                    if (hasField('dht22currenttemp')) {
+                      this.dht22currenttemp = data.dht22currenttemp;
+                    }
+                    if (hasField('dht22currenthumi')) {
+                      this.dht22currenthumi = data.dht22currenthumi;
+                    }
+                    if (hasField('dht22thresholdtemphigh')) {
+                      this.dht22thresholdtemphigh = data.dht22thresholdtemphigh;
+                    }
+                    if (hasField('dht22thresholdtemplow')) {
+                      this.dht22thresholdtemplow = data.dht22thresholdtemplow;
+                    }
+                    if (hasField('dht22thresholdhumihigh')) {
+                      this.dht22thresholdhumihigh = data.dht22thresholdhumihigh;
+                    }
+                    if (hasField('dht22thresholdhumilow')) {
+                      this.dht22thresholdhumilow = data.dht22thresholdhumilow;
+                    }
+                    if (hasField('nuld2410pred')) {
+                      this.nuld2410pred = data.nuld2410pred;
+                    }
+                    if (hasField('nuld2410new')) {
+                      this.nuld2410new = data.nuld2410new;
+                      this.isSaveDisabled = this.isFirmwareUpgrading ? true : !data.nuld2410new;
+                    }
+                    if (hasField('sysLearnstillnessstatus')) {
+                      this.sysLearnstillnessstatus = data.sysLearnstillnessstatus;
+                    }
+                    if (hasField('sysLearnsomebodystatus')) {
+                      this.sysLearnsomebodystatus = data.sysLearnsomebodystatus;
+                    }
+                    if (hasField('sysLearnnobodystatus')) {
+                      this.sysLearnnobodystatus = data.sysLearnnobodystatus;
+                    }
+                    this.isSaveDisabled = this.isFirmwareUpgrading ? true : !this.nuld2410new;
+                    this.applyLearnStatus();
+                    break;
+                  }
+                  default:
+                    break;
+                }
+              }
+            })
+            .catch(error => console.error('Error fetching data:', error));
+        },
+        updateLevelsByFacility() {
+          const selected = this.getSelectedFacilities();
+          const statusList = Array.isArray(this.syslogstatus) ? this.syslogstatus : [];
+          if (selected.length === 0) {
+            this.form.facility = '';
+            this.form.level0 = false;
+            this.form.level1 = false;
+            this.form.level2 = false;
+            this.form.level3 = false;
+            this.form.level4 = false;
+            return;
+          }
+          this.form.facility = String(selected[0]);
+          const allHaveBit = (bit) => selected.every((id) => {
+            const status = statusList[id] || 0;
+            return !!(status & (1 << bit));
+          });
+          this.form.level0 = allHaveBit(0);
+          this.form.level1 = allHaveBit(1);
+          this.form.level2 = allHaveBit(2);
+          this.form.level3 = allHaveBit(3);
+          this.form.level4 = allHaveBit(4);
+        },
+        updateLocalLogLevel() {
+          const selected = this.getSelectedFacilities();
+          if (!Array.isArray(this.syslogstatus)) {
+            this.syslogstatus = [];
+          }
+          const targets = selected.length ? selected : this.getSelectedFacilities(true);
+          if (targets.length === 0) {
+            return;
+          }
+          const mask = (this.form.level0 << 0) | (this.form.level1 << 1) | (this.form.level2 << 2) | (this.form.level3 << 3) | (this.form.level4 << 4);
+          targets.forEach((id) => {
+            if (id < 0) {
+              return;
+            }
+            while (this.syslogstatus.length <= id) {
+              this.syslogstatus.push(0);
+            }
+            this.syslogstatus[id] = mask;
+          });
+          this.updateLevelsByFacility();
+        },
+        getSelectedFacilities(includeFallback = false) {
+          const selection = this.form.facilities;
+          let list = [];
+          if (Array.isArray(selection) && selection.length) {
+            list = selection;
+          } else if (!Array.isArray(selection) && selection) {
+            list = [selection];
+          }
+          let ids = list.map((value) => parseInt(value, 10)).filter((value) => !Number.isNaN(value));
+          if (includeFallback && ids.length === 0 && this.form.facility !== '') {
+            const fallback = parseInt(this.form.facility, 10);
+            if (!Number.isNaN(fallback)) {
+              ids = [fallback];
+            }
+          }
+          return ids;
+        },
+        submitForm() {
+          const selectedTargets = this.getSelectedFacilities(true);
+          const facilityList = selectedTargets.join(',');
+          const basePayload = Object.assign({}, this.form);
+          delete basePayload.facilities;
+          const payload = Object.assign({}, basePayload, {
+            facility: selectedTargets.length ? String(selectedTargets[0]) : '',
+            facilityList: facilityList
+          });
+          fetch('/submitform', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          })
+            .then((response) => response.text())
+            .then((data) => {
+              console.log('Response from server:', data);
+              this.fetchData(1);
+            })
+            .catch((error) => console.error('Error submitting form:', error));
+        },
+        startFirmwareUpgrade() {
+          console.log('Starting firmware upgrade...');
+          if (this.otaInterval) {
+            clearInterval(this.otaInterval);
+          }
+          if (this.displayInterval) {
+            clearInterval(this.displayInterval);
+            this.displayInterval = 0;
+          }
+          this.showConfig = false;
+          this.showAutoLearning = false;
+          this.showOTAProgressBar = true;
+          this.isFirmwareUpgrading = true;
+          this.otaFailureCount = 0;
+          this.isResetDisabled = true;
+          this.isDisplayDisabled = true;
+          this.isSaveDisabled = true;
+          this.isLearnStillDisabled = true;
+          this.isLearnSoBodyDisabled = true;
+          this.isLearnNoBodyDisabled = true;
+          this.isStopDisabled = true;
+          this.isDebugSomebodyDisabled = true;
+          this.isDebugNobodyDisabled = true;
+          this.isDebugOffDisabled = true;
+          this.isFirmwareUpgradeDisabled = true;
+          this.isRebootDisabled = true;
+          this.isEraseDataDisabled = true;
+          this.otaCountdown = 0;
+          this.otaPercent = 0;
+          this.otaPercentText = '0%';
+          this.ensureFirmwarePolling(true);
+        },
+        startCountdown() {
+          this.otaCountdown = 15;
+          const countdownInterval = setInterval(() => {
+            if (this.otaCountdown > 0) {
+              this.otaCountdown--;
+              this.otaPercentText = `Rebooting, Please Wait (${this.otaCountdown} sec.)`;
+            } else {
+              clearInterval(countdownInterval);
+              location.reload();
+            }
+          }, 1000);
+        },
+        getColorForPercentage(percent) {
+          const red = Math.round(206 - (percent * 206) / 100);
+          const green = Math.round(206 - (percent * 206) / 100);
+          const blue = 255;
+          const color = (red << 16) | (green << 8) | blue;
+          return '#' + color.toString(16).padStart(6, '0');
+        },
+        downloadWeights() {
+          console.log('Downloading NU weights...');
+          fetch('/fetchvue?action=701')
+            .then(response => response.json())
+            .then(data => {
+              if (data['action-status'] === 1) {
+                // Create downloadable JSON file
+                const weightsData = {
+                  model: data.model,
+                  version: data.version,
+                  input_size: data.input_size,
+                  hidden_size: data.hidden_size,
+                  output_size: data.output_size,
+                  w_ih: data.w_ih,
+                  w_ho: data.w_ho,
+                  b_h: data.b_h,
+                  b_o: data.b_o,
+                  exported_at: new Date().toISOString(),
+                  device: window.location.hostname
+                };
+                const blob = new Blob([JSON.stringify(weightsData, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                const hostname = window.location.hostname || 'esp32';
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+                a.download = `nu_weights_${hostname}_${timestamp}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                console.log('Weights downloaded successfully');
+              } else {
+                alert('Failed to download weights');
+              }
+            })
+            .catch(error => {
+              console.error('Error downloading weights:', error);
+              alert('Error downloading weights: ' + error.message);
+            });
+        },
+        uploadWeights(event) {
+          const file = event.target.files[0];
+          if (!file) return;
+
+          console.log('Uploading NU weights from file:', file.name);
+
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            try {
+              const weightsData = JSON.parse(e.target.result);
+
+              // Validate required fields
+              if (!weightsData.w_ih || !weightsData.w_ho || !weightsData.b_h || !weightsData.b_o) {
+                alert('Invalid weights file: missing required fields (w_ih, w_ho, b_h, b_o)');
+                return;
+              }
+
+              // Send to server
+              fetch('/nu_upload', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(weightsData)
+              })
+                .then(response => response.json())
+                .then(data => {
+                  if (data.status === 'success') {
+                    alert('Weights uploaded to memory successfully!\nPress "Save" to persist to flash.');
+                    console.log('Weights uploaded:', data.message);
+                  } else {
+                    alert('Failed to upload weights: ' + (data.message || 'Unknown error'));
+                  }
+                })
+                .catch(error => {
+                  console.error('Error uploading weights:', error);
+                  alert('Error uploading weights: ' + error.message);
+                });
+            } catch (parseError) {
+              console.error('Error parsing weights file:', parseError);
+              alert('Invalid JSON file: ' + parseError.message);
+            }
+          };
+          reader.readAsText(file);
+
+          // Reset file input so the same file can be selected again
+          event.target.value = '';
+        }
+      },
+      watch: {
+        otaPercent(newVal) {
+          if (!this.isFirmwareUpgrading) {
+            return;
+          }
+          if (newVal >= 100) {
+            clearInterval(this.otaInterval);
+            this.startCountdown();
+          } else {
+            this.otaPercentText = newVal + '%';
+          }
+        }
+      }
+    });
+  </script>
+</body>
+
+</html>
