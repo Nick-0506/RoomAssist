@@ -26,6 +26,17 @@ This is a smart room management assistant that integrates air quality monitoring
 ### 硬體接線圖
 ![硬體接線圖](img/HWV30B.jpg)
 
+### Web 介面
+#### 空氣品質監測
+![空氣品質監測介面](img/AirQuality.png)
+
+#### 神經網路設定
+![ANN 神經網路設定](img/ANN.png)
+
+#### 系統設定
+![系統設定介面](img/Configuration.png)
+
+
 
 ## Console
 
