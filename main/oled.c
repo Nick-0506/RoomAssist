@@ -503,7 +503,15 @@ void task_oled(void *pvParameter)
           {
             gfan_countdown_end_us = 0;
             xSemaphoreGive(gsemaLED);
-            oled_setDisplayMode(LED_DISPLAY_MODE_OFF);
+            if (gled_display_timer_handle != NULL &&
+                esp_timer_is_active(gled_display_timer_handle))
+            {
+              oled_setDisplayMode(LED_DISPLAY_MODE_TIME);
+            }
+            else
+            {
+              oled_setDisplayMode(LED_DISPLAY_MODE_OFF);
+            }
             xSemaphoreTake(gsemaLED, portMAX_DELAY);
           }
           else

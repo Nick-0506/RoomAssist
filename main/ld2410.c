@@ -456,7 +456,12 @@ static uint8_t ld2410_nu_checkreply(uint8_t *data, int length)
                     {
                         if (xSemaphoreTake(gsemaLED, portMAX_DELAY) == pdTRUE)
                         {
-                            oled_setDisplayMode(LED_DISPLAY_MODE_TIME);
+                            int curmode = 0;
+                            oled_getDisplayMode(&curmode);
+                            if (curmode != LED_DISPLAY_MODE_FAN_COUNTDOWN)
+                            {
+                                oled_setDisplayMode(LED_DISPLAY_MODE_TIME);
+                            }
                             xSemaphoreGive(gsemaLED);
                         }
                         if (gled_display_timer_handle != NULL)
