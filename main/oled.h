@@ -15,6 +15,7 @@
 #define LED_DISPLAY_MODE_FWUG           3
 #define LED_DISPLAY_MODE_WIFI_PROV      4
 #define LED_DISPLAY_MODE_HOMEKIT_PAIR   5
+#define LED_DISPLAY_MODE_FAN_COUNTDOWN  6
 
 #define LED_DISPLAY_TIME    30 /* Seconds */
 #define LED_SNOOZE_TIME     30 /* Seconds */
@@ -25,6 +26,8 @@
 
 void led_display_app_timer_callback();
 void oled_saveconfig(char *key, int32_t data);
+void oled_fan_countdown_start(int seconds);
+void oled_fan_countdown_stop(void);
 void draw_qrcode_to_oled(SSD1306_t * dev, const uint8_t *qrcode, int size);
 bool generate_qrcode_data(const char *text, uint8_t *qrcode_out, size_t *size_out);
 

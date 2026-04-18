@@ -29,6 +29,7 @@ int gleddisplaytime = LED_DISPLAY_TIME;
 int gledsnoozetime = LED_SNOOZE_TIME;
 int gleddisplaymode = LED_DISPLAY_MODE_TIME;
 int gpreleddisplaymode = -1;
+static volatile int64_t gfan_countdown_end_us = 0;
 int gsnoozeloc = 0;
 uint8_t temp[QR_BUFFER_LEN];
 
@@ -78,6 +79,9 @@ int oled_setDisplayMode(int mode)
         case LED_DISPLAY_MODE_SNOOZE:
           timer_duration = gledsnoozetime;
           break;
+        case LED_DISPLAY_MODE_FAN_COUNTDOWN:
+          timer_duration = 0; /* managed by countdown expiry */
+          break;
         default:
           timer_duration = 0;
           break;
@@ -92,6 +96,23 @@ int oled_setDisplayMode(int mode)
     xSemaphoreGive(gsemaOLEDCfg);
   }
   return SYSTEM_ERROR_NONE;
+}
+
+void oled_fan_countdown_start(int seconds)
+{
+  gfan_countdown_end_us = esp_timer_get_time() + (int64_t)seconds * 1000000;
+  oled_setDisplayMode(LED_DISPLAY_MODE_FAN_COUNTDOWN);
+}
+
+void oled_fan_countdown_stop(void)
+{
+  int mode = 0;
+  oled_getDisplayMode(&mode);
+  if (mode == LED_DISPLAY_MODE_FAN_COUNTDOWN)
+  {
+    gfan_countdown_end_us = 0;
+    oled_setDisplayMode(LED_DISPLAY_MODE_OFF);
+  }
 }
 
 int oled_getDisplayTime(int *time)
@@ -475,6 +496,40 @@ void task_oled(void *pvParameter)
           ssd1306_display_text(&leddev, 6, out[6], strlen(out[6]), false);
           ssd1306_display_text(&leddev, 7, out[7], strlen(out[7]), false);
         }
+        if (orileddisplaymode == LED_DISPLAY_MODE_FAN_COUNTDOWN)
+        {
+          int64_t remaining_us = gfan_countdown_end_us - esp_timer_get_time();
+          if (remaining_us <= 0)
+          {
+            gfan_countdown_end_us = 0;
+            xSemaphoreGive(gsemaLED);
+            oled_setDisplayMode(LED_DISPLAY_MODE_OFF);
+            xSemaphoreTake(gsemaLED, portMAX_DELAY);
+          }
+          else
+          {
+            int remaining_s = (int)(remaining_us / 1000000);
+            int min = remaining_s / 60;
+            int sec = remaining_s % 60;
+            static const char spinner[] = "|/-\\";
+            int spin_idx = (int)(esp_timer_get_time() / 500000) % 4;
+
+            if (gpreleddisplaymode != orileddisplaymode)
+            {
+              ssd1306_clear_screen(&leddev, false);
+              ssd1306_bitmaps(&leddev, 0, 18, raw, 128, 1, false);
+            }
+            sprintf(out[0], "FAN  %c", spinner[spin_idx]);
+            ssd1306_display_text_x2(&leddev, 0, out[0], strlen(out[0]), false);
+
+            sprintf(out[3], "%2d:%02d ", min, sec);
+            ssd1306_display_text_x3(&leddev, 3, out[3], strlen(out[3]), false);
+
+            system_get_ip(&sys_ip_info);
+            sprintf(out[7], " " IPSTR, IP2STR(&sys_ip_info.ip));
+            ssd1306_display_text(&leddev, 7, out[7], strlen(out[7]), false);
+          }
+        }
         if (orileddisplaymode == LED_DISPLAY_MODE_WIFI_PROV)
         {
           if (gpreleddisplaymode != orileddisplaymode)
@@ -583,6 +638,9 @@ void led_display_app_timer_callback()
       case LED_DISPLAY_MODE_HOMEKIT_PAIR:
         /* Homekit timeout turn off led */
         oled_setDisplayMode(LED_DISPLAY_MODE_OFF);
+        break;
+      case LED_DISPLAY_MODE_FAN_COUNTDOWN:
+        /* Managed by countdown expiry, no auto-transition */
         break;
       default:
         break;

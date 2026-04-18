@@ -9,6 +9,7 @@
 #include "max9814.h"
 #include "system.h"
 #include "homekit.h"
+#include "oled.h"
 #include "ld2410.h"
 #include "elf.h"
 #include "syslog.h"
@@ -555,6 +556,7 @@ static void ir_parse_ir_frame(rmt_symbol_word_t *rmt_nec_symbols,
                                            "IR stop fan only timer");
                             ESP_ERROR_CHECK(
                                 esp_timer_stop(ghitachiac_delay_timer_handle));
+                            oled_fan_countdown_stop();
                         }
                     }
                     syslog_handler(
@@ -1141,6 +1143,7 @@ int ir_hitachiac_tigger(rmt_hattg_msg_t msg)
                 syslog_handler(SYSLOG_FACILITY_RMT, SYSLOG_LEVEL_DEBUG,
                                "Hitachi AC tiggered stop fan only timer");
                 ESP_ERROR_CHECK(esp_timer_stop(ghitachiac_delay_timer_handle));
+                oled_fan_countdown_stop();
             }
         }
         else
@@ -1187,6 +1190,7 @@ int ir_hitachiac_tigger(rmt_hattg_msg_t msg)
                     (ori_mode == HAP_AC_MODE_COOLER ? "Cooler" : "Auto"));
                 ESP_ERROR_CHECK(esp_timer_start_once(
                     ghitachiac_delay_timer_handle, (10 * 60 * 1000 * 1000)));
+                oled_fan_countdown_start(10 * 60);
             }
             else
             {
