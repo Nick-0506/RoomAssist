@@ -19,7 +19,7 @@ set(EXTRA_COMPONENT_DIRS ${HOMEKIT_PATH}/components ${HOMEKIT_PATH}/components/h
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 
 # Define version and build time
-set(BUILD_VERSION "2.1.8")
+set(BUILD_VERSION "2.1.9")
 execute_process(
     COMMAND date +%Y-%m-%d_%H:%M:%S
     OUTPUT_VARIABLE BUILD_TIME
