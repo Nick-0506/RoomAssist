@@ -1,4 +1,5 @@
 cJSON/
 /build
+/managed_components
 .vscode/settings.json
 img/.DS_Store
