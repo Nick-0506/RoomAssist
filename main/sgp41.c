@@ -46,6 +46,9 @@
     ((float)AQ_IDLETIME / 1000.0f / \
      43200.0f)  // 12 Hours Time Constant (Sensirion Official)
 #define SGP41_NOX_LEARNING_RATE ((float)AQ_IDLETIME / 1000.0f / 43200.0f)
+// Upward accel rate: 10x normal → ~1.2h TC. Smooth enough to reject single
+// noise spikes while still tracking genuine air quality improvements.
+#define SGP41_ACCEL_LEARNING_MULTIPLIER 10.0f
 
 // ABC / NVS Parameters
 #define SGP41_NVS_NAMESPACE "sgp41_base"
@@ -185,65 +188,47 @@ static int sgp41_compute_index(uint16_t sample, float *baseline,
                                float offset_val, int gating_high,
                                int gating_low, bool *is_gated)
 {
-    // 1. Calculate Tentative Index (Pre-Update)
-    float delta_check = *baseline - (float)sample;
-    float normalized_check = offset_val + (delta_check / sensitivity);
-    if (normalized_check < 0.0f) normalized_check = 0.0f;
-    if (normalized_check > 500.0f) normalized_check = 500.0f;
-    int tentative_index = (int)lroundf(normalized_check);
+    // 1. Compute index from pre-update baseline so gating decision and
+    //    returned value are always consistent.
+    float delta = *baseline - (float)sample;
+    float normalized = offset_val + (delta / sensitivity);
+    if (normalized < 0.0f) normalized = 0.0f;
+    if (normalized > 500.0f) normalized = 500.0f;
+    int index = (int)lroundf(normalized);
 
-    // 2. Update Gating State (Hysteresis)
-    // Lock if >= High (User Alarm Limit)
-    // Unlock if < Low (User Alarm Clear Limit)
-    // If no thresholds provided (e.g. 0), disable gating
+    // 2. Update gating state (hysteresis) using the same index
     if (gating_high > 0)
     {
         if (!(*is_gated))
         {
-            if (tentative_index >= gating_high) *is_gated = true;
+            if (index >= gating_high) *is_gated = true;
         }
         else
         {
-            if (tentative_index < gating_low) *is_gated = false;
+            if (index < gating_low) *is_gated = false;
         }
     }
 
-    // 3. Baseline Update Logic
-    // ONLY update baseline if NOT Gated (Pollution)
-    // EXCEPTION: If we find Cleaner Air (sample > baseline), ALWAYS update
-    // (Accel Mode)
-
+    // 3. Baseline update
     if (*baseline <= 0.0f)
     {
-        *baseline = sample;
+        *baseline = (float)sample;
     }
-    else
+    else if ((float)sample > *baseline)
     {
-        if (sample > *baseline)
-        {
-            // Found cleaner air, update baseline quickly (Accel Mode)
-            // Even if gated (polluted), finding cleaner air means our baseline
-            // was wrong.
-            *baseline = sample;
-        }
-        else
-        {
-            // Normal Learning: Only if NOT Gated
-            if (!(*is_gated))
-            {
-                *baseline += ((float)sample - *baseline) * learning_rate;
-            }
-            // Else: Gating Active. Do NOT decay baseline.
-        }
+        // Air is cleaner: use fast EMA instead of immediate jump to avoid a
+        // single noise spike permanently inflating the baseline.
+        float accel_rate = learning_rate * SGP41_ACCEL_LEARNING_MULTIPLIER;
+        if (accel_rate > 1.0f) accel_rate = 1.0f;
+        *baseline += ((float)sample - *baseline) * accel_rate;
+    }
+    else if (!(*is_gated))
+    {
+        // Normal learning: slow EMA. Only when not gated.
+        *baseline += ((float)sample - *baseline) * learning_rate;
     }
 
-    // 4. Final Calculation
-    float delta = *baseline - (float)sample;
-    float normalized = offset_val + (delta / sensitivity);
-
-    if (normalized < 0.0f) normalized = 0.0f;
-    if (normalized > 500.0f) normalized = 500.0f;
-    return (int)lroundf(normalized);
+    return index;
 }
 
 void sgp41_deinit(void)
@@ -481,18 +466,46 @@ static esp_err_t sgp41_measure_locked(const sgp41_environment_t *env,
 
             if (voc_deviation > SGP41_BASELINE_WARNING_THRESHOLD)
             {
-                syslog_handler(SYSLOG_FACILITY_AIRQUALITY, SYSLOG_LEVEL_WARNING,
-                               "SGP41: VOC Baseline deviation %.0f exceeds "
-                               "warning threshold",
-                               voc_deviation);
+                if (!s_voc_is_gated)
+                {
+                    // Large deviation with no active pollution event means the
+                    // baseline drifted (e.g. accel noise). Reset to current.
+                    syslog_handler(SYSLOG_FACILITY_AIRQUALITY,
+                                   SYSLOG_LEVEL_WARNING,
+                                   "SGP41: VOC Baseline deviation %.0f, no "
+                                   "active pollution, forcing reset to %u",
+                                   voc_deviation, sraw_voc);
+                    s_voc_baseline_ticks = (float)sraw_voc;
+                }
+                else
+                {
+                    syslog_handler(SYSLOG_FACILITY_AIRQUALITY,
+                                   SYSLOG_LEVEL_WARNING,
+                                   "SGP41: VOC Baseline deviation %.0f "
+                                   "(gating active, pollution event)",
+                                   voc_deviation);
+                }
             }
 
             if (nox_deviation > SGP41_BASELINE_WARNING_THRESHOLD)
             {
-                syslog_handler(SYSLOG_FACILITY_AIRQUALITY, SYSLOG_LEVEL_WARNING,
-                               "SGP41: NOx Baseline deviation %.0f exceeds "
-                               "warning threshold",
-                               nox_deviation);
+                if (!s_nox_is_gated)
+                {
+                    syslog_handler(SYSLOG_FACILITY_AIRQUALITY,
+                                   SYSLOG_LEVEL_WARNING,
+                                   "SGP41: NOx Baseline deviation %.0f, no "
+                                   "active pollution, forcing reset to %u",
+                                   nox_deviation, sraw_nox);
+                    s_nox_baseline_ticks = (float)sraw_nox;
+                }
+                else
+                {
+                    syslog_handler(SYSLOG_FACILITY_AIRQUALITY,
+                                   SYSLOG_LEVEL_WARNING,
+                                   "SGP41: NOx Baseline deviation %.0f "
+                                   "(gating active, pollution event)",
+                                   nox_deviation);
+                }
             }
         }
 
