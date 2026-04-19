@@ -62,7 +62,7 @@ typedef enum
     SGP41_STATE_NORMAL          // 5min+: Normal operation
 } sgp41_state_t;
 
-#define SGP41_CONDITIONING_DURATION_US (60LL * 1000LL * 1000LL)  // 60 seconds
+#define SGP41_CONDITIONING_DURATION_US (10LL * 1000LL * 1000LL)  // 10 seconds (datasheet max)
 #define SGP41_FAST_LEARNING_DURATION_US \
     (5LL * 60LL * 1000LL * 1000LL)                 // 5 minutes
 #define SGP41_BASELINE_SANITY_THRESHOLD 5000.0f    // Ticks deviation threshold
@@ -346,44 +346,39 @@ static esp_err_t sgp41_measure_locked(const sgp41_environment_t *env,
 
     esp_err_t ret;
     int64_t now_us = esp_timer_get_time();
-    bool conditioning_phase = false;
 
-    // 1. Conditioning Phase Logic
+    // 1. Conditioning Phase: call execute_conditioning every call for up to 10s.
+    // Datasheet: 10s must not be exceeded to avoid damage to sensing material.
     if (s_conditioning_deadline_us == 0)
     {
         syslog_handler(SYSLOG_FACILITY_AIRQUALITY, SYSLOG_LEVEL_INFO,
-                       "SGP41: Starting Conditioning (60s)");
+                       "SGP41: Starting Conditioning (10s)");
         s_conditioning_deadline_us = now_us + SGP41_CONDITIONING_DURATION_US;
+    }
 
-        uint16_t default_rh = 0x8000;
-        uint16_t default_t = 0x6666;
-
-        uint8_t cmd_data[8];
-        cmd_data[0] = 0x26;
-        cmd_data[1] = 0x12;
-        cmd_data[2] = (uint8_t)(default_rh >> 8);
-        cmd_data[3] = (uint8_t)(default_rh & 0xFF);
-        cmd_data[4] = sgp41_crc(cmd_data[2], cmd_data[3]);
-        cmd_data[5] = (uint8_t)(default_t >> 8);
-        cmd_data[6] = (uint8_t)(default_t & 0xFF);
-        cmd_data[7] = sgp41_crc(cmd_data[5], cmd_data[6]);
-
-        ret = i2c_master_write_to_device(SGP41_I2C_PORT, SGP41_I2C_ADDRESS,
-                                         cmd_data, 8,
-                                         pdMS_TO_TICKS(SGP41_I2C_TIMEOUT_MS));
+    if (now_us < s_conditioning_deadline_us)
+    {
+        uint8_t cond_buf[3];
+        ret = write_read_measurement(SGP41_CMD_EXECUTE_CONDITIONING,
+                                     0x8000, 0x6666, cond_buf, 3);
         if (ret != ESP_OK)
         {
-            s_conditioning_deadline_us = 0;
             ESP_LOGE(TAG_SGP41, "Conditioning I2C Error: %s",
                      esp_err_to_name(ret));
             return ret;
         }
-        vTaskDelay(pdMS_TO_TICKS(SGP41_CONDITIONING_DELAY_MS));
-        conditioning_phase = true;
-    }
-    else if (now_us < s_conditioning_deadline_us)
-    {
-        conditioning_phase = true;
+        if (sgp41_crc(cond_buf[0], cond_buf[1]) != cond_buf[2])
+        {
+            ESP_LOGE(TAG_SGP41, "CRC Mismatch conditioning response");
+            return ESP_ERR_INVALID_CRC;
+        }
+        sgp41_measurement_t measurement = {0};
+        measurement.voc_ticks = (cond_buf[0] << 8) | cond_buf[1];
+        measurement.nox_ticks = 0;
+        measurement.voc_index = -1;
+        measurement.nox_index = -1;
+        *result = measurement;
+        return ESP_OK;
     }
 
     // 2. Measure Raw
@@ -428,15 +423,11 @@ static esp_err_t sgp41_measure_locked(const sgp41_environment_t *env,
     uint16_t sraw_voc = (read_buffer[0] << 8) | read_buffer[1];
     uint16_t sraw_nox = (read_buffer[3] << 8) | read_buffer[4];
 
-    /* syslog_handler(SYSLOG_FACILITY_AIRQUALITY, SYSLOG_LEVEL_DEBUG,
-        "SGP41 Raw Ticks: VOC=%u, NOx=%u", sraw_voc, sraw_nox); */
-
     sgp41_measurement_t measurement = {0};
     measurement.voc_ticks = sraw_voc;
     measurement.nox_ticks = sraw_nox;
 
     // 3. State Machine Transitions & Baseline Calibration
-    if (!conditioning_phase)
     {
         s_measurement_count++;
         int64_t elapsed_us = now_us - s_state_start_time;
@@ -579,11 +570,6 @@ static esp_err_t sgp41_measure_locked(const sgp41_environment_t *env,
 
             s_last_debug_log_timestamp = now_us;
         }
-    }
-    else
-    {
-        measurement.voc_index = -1;
-        measurement.nox_index = -1;
     }
 
     *result = measurement;
