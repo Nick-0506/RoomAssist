@@ -17,6 +17,7 @@
 #include "esp_wifi.h"
 #include "driver/gpio.h"
 #include "esp_log.h"
+#include <time.h>
 
 /* Hitachi IR Protocol default data */
 uint8_t grmt_htaBuffer[44] = {
@@ -38,6 +39,28 @@ uint8_t grmt_deltascheduler[IR_DELTA_FAN_TIGGER_MODE_MAX] = {
 uint8_t grmt_deltaschedulerName[IR_DELTA_FAN_TIGGER_MODE_MAX + 1][10] = {
     "Manual", "Exhaust", "Warm", "Dry", "Homekit", "Schedl", "Off", "Keep"};
 QueueHandle_t gqueue_rmt_tx;
+
+typedef struct { uint32_t count; uint32_t duration_s; } delta_fan_day_stats_t;
+static delta_fan_day_stats_t s_df_today     = {0, 0};
+static delta_fan_day_stats_t s_df_yesterday = {0, 0};
+static int    s_df_yday       = -1;
+static bool   s_df_running    = false;
+static time_t s_df_on_time    = 0;
+
+static void df_stats_rollover_check(time_t now_t, struct tm *now_tm)
+{
+    if (s_df_yday == -1) { s_df_yday = now_tm->tm_yday; return; }
+    if (now_tm->tm_yday == s_df_yday) return;
+    if (s_df_running)
+    {
+        s_df_today.duration_s += (uint32_t)(now_t - s_df_on_time);
+        s_df_on_time = now_t;
+    }
+    s_df_yesterday = s_df_today;
+    s_df_today     = (delta_fan_day_stats_t){0, 0};
+    s_df_yday      = now_tm->tm_yday;
+}
+
 ir_hta_scan_code_t grmt_hta_data;
 ir_zro_scan_code_t grmt_zro_data;
 ir_delta_scan_code_t grmt_delta_data;
@@ -1750,6 +1773,26 @@ int ir_deltafan_tigger(int mode, int active, int duration)
                                "EnQueue Delta IR %d", rmt_msg.type);
             }
         }
+        /* Daily stats tracking */
+        {
+            time_t now_t;
+            struct tm now_tm;
+            time(&now_t);
+            localtime_r(&now_t, &now_tm);
+            df_stats_rollover_check(now_t, &now_tm);
+            bool fan_on = (running_mode < IR_DELTA_FAN_TIGGER_MODE_OFF);
+            if (fan_on && !s_df_running)
+            {
+                s_df_today.count++;
+                s_df_on_time = now_t;
+                s_df_running = true;
+            }
+            else if (!fan_on && s_df_running)
+            {
+                s_df_today.duration_s += (uint32_t)(now_t - s_df_on_time);
+                s_df_running = false;
+            }
+        }
         xSemaphoreGive(gsemaRmtDeltaSche);
     }
     return true;
@@ -1786,6 +1829,28 @@ int ir_set_deltascheduler(int index, uint8_t scheduler)
         xSemaphoreGive(gsemaRmtDeltaSche);
     }
     return SYSTEM_ERROR_NONE;
+}
+
+void ir_get_deltafan_daily_stats(uint32_t *ytd_count, uint32_t *ytd_dur_s,
+                                  uint32_t *today_count, uint32_t *today_dur_s)
+{
+    if (gsemaRmtDeltaSche == NULL) { return; }
+    if (xSemaphoreTake(gsemaRmtDeltaSche, portMAX_DELAY) == pdTRUE)
+    {
+        time_t now_t;
+        struct tm now_tm;
+        time(&now_t);
+        localtime_r(&now_t, &now_tm);
+        df_stats_rollover_check(now_t, &now_tm);
+        if (ytd_count)   *ytd_count   = s_df_yesterday.count;
+        if (ytd_dur_s)   *ytd_dur_s   = s_df_yesterday.duration_s;
+        if (today_count) *today_count = s_df_today.count;
+        uint32_t cur_dur = s_df_today.duration_s;
+        if (s_df_running && now_t > s_df_on_time)
+            cur_dur += (uint32_t)(now_t - s_df_on_time);
+        if (today_dur_s) *today_dur_s = cur_dur;
+        xSemaphoreGive(gsemaRmtDeltaSche);
+    }
 }
 
 void ir_hitachiac_delay_timer_callback()

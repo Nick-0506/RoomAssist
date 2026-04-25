@@ -226,6 +226,8 @@ int ir_set_deltascheduler(int, uint8_t);
 int ir_set_hitachi_config(uint8_t config);
 int ir_get_hitachi_config(uint8_t *config);
 int rmt_form_tx_data(rmt_msg_t *rmt_msg);
+void ir_get_deltafan_daily_stats(uint32_t *ytd_count, uint32_t *ytd_dur_s,
+                                  uint32_t *today_count, uint32_t *today_dur_s);
 #ifdef __cplusplus
 }
 #endif

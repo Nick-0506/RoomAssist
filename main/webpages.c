@@ -873,6 +873,12 @@ static esp_err_t http_api_env_updt(httpd_req_t *req)
         http_printf(req, "\"fsInterval\": %lu,", fs_interval);
         http_printf(req, "\"fsRun\": %lu,", fs_run);
         http_printf(req, "\"fsEnabled\": %d,", (int)fs_enabled);
+        uint32_t df_ytd_cnt = 0, df_ytd_dur = 0, df_today_cnt = 0, df_today_dur = 0;
+        ir_get_deltafan_daily_stats(&df_ytd_cnt, &df_ytd_dur, &df_today_cnt, &df_today_dur);
+        http_printf(req, "\"dfYestCount\": %lu,", df_ytd_cnt);
+        http_printf(req, "\"dfYestDurS\": %lu,", df_ytd_dur);
+        http_printf(req, "\"dfTodayCount\": %lu,", df_today_cnt);
+        http_printf(req, "\"dfTodayDurS\": %lu,", df_today_dur);
     }
     dht22_getcurrenttemperature(&temperature);
     dht22_getcurrenthumidity(&humidity);
@@ -1006,6 +1012,12 @@ static esp_err_t http_api_loading(httpd_req_t *req)
         http_printf(req, "\"fsInterval\": %lu,", fs_interval_l);
         http_printf(req, "\"fsRun\": %lu,", fs_run_l);
         http_printf(req, "\"fsEnabled\": %d,", (int)fs_enabled_l);
+        uint32_t df_ytd_cnt_l = 0, df_ytd_dur_l = 0, df_today_cnt_l = 0, df_today_dur_l = 0;
+        ir_get_deltafan_daily_stats(&df_ytd_cnt_l, &df_ytd_dur_l, &df_today_cnt_l, &df_today_dur_l);
+        http_printf(req, "\"dfYestCount\": %lu,", df_ytd_cnt_l);
+        http_printf(req, "\"dfYestDurS\": %lu,", df_ytd_dur_l);
+        http_printf(req, "\"dfTodayCount\": %lu,", df_today_cnt_l);
+        http_printf(req, "\"dfTodayDurS\": %lu,", df_today_dur_l);
     }
     dht22_getcurrenttemperature(&temperature);
     dht22_getcurrenthumidity(&humidity);
