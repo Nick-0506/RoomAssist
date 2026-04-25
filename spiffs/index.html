@@ -113,32 +113,35 @@
 
 <body>
   <div id="app" class="hidden">
-    Build Version: {{ sysBuildversion }} ({{ sysBuildTime }})<br>
-    Artificial Neural Network Model: Feedforward Neural Network <br>
-    Temperature: {{ dht22currenttemp }} (°C) Humidity: {{ dht22currenthumi }} (%)<br>
+    <div style="text-align:right; padding:4px 8px;">
+      <button @click="toggleLang" style="font-size:0.85em; padding:2px 8px;">{{ t.langToggle }}</button>
+    </div>
+    {{ t.buildVersion }}{{ sysBuildversion }} ({{ sysBuildTime }})<br>
+    {{ t.annModel }}<br>
+    {{ t.temperature }}{{ dht22currenttemp }} (°C) {{ t.humidity }}{{ dht22currenthumi }} (%)<br>
     <div v-if="showAirQuality">
-      Air Quality (VOC):
-      <span v-if="mq135currentdata == -1" style="color: red;">Sensor Error</span>
-      <span v-else>{{ mq135currentdata }} (Limit >= {{ mq135thresholdhigh }})</span>
+      {{ t.airQualityVoc }}
+      <span v-if="mq135currentdata == -1" style="color: red;">{{ t.sensorError }}</span>
+      <span v-else>{{ mq135currentdata }} （{{ t.limitGe }} {{ mq135thresholdhigh }}）</span>
       <br>
 
       <span v-if="sgp41nox !== undefined">
-        NOx Index:
-        <span v-if="sgp41nox == -1" style="color: red;">Sensor Error</span>
-        <span v-else>{{ sgp41nox }} (Smoke >= {{ sgp41noxhigh }})</span>
+        {{ t.noxIndex }}
+        <span v-if="sgp41nox == -1" style="color: red;">{{ t.sensorError }}</span>
+        <span v-else>{{ sgp41nox }} （{{ t.smokeGe }} {{ sgp41noxhigh }}）</span>
       </span>
       <br>
     </div>
 
     <div class="section">
-      <h3>History</h3>
+      <h3>{{ t.history }}</h3>
       <canvas id="EnvironmentChart"></canvas>
       <div v-if="showAirQuality" style="margin-top:8px; font-size:0.9em;">
-        <b>排風扇統計</b><br>
-        昨日：{{ dfYestCount }} 次，累積 {{ Math.floor(dfYestDurS / 3600) }} 時 {{ Math.floor((dfYestDurS % 3600) / 60) }} 分<br>
-        今日：{{ dfTodayCount }} 次，累積 {{ Math.floor(dfTodayDurS / 3600) }} 時 {{ Math.floor((dfTodayDurS % 3600) / 60) }} 分
+        <b>{{ t.fanStats }}</b><br>
+        {{ t.yesterday }}{{ dfYestCount }} {{ t.timesAccum }} {{ Math.floor(dfYestDurS / 3600) }}{{ t.hourUnit }} {{ Math.floor((dfYestDurS % 3600) / 60) }}{{ t.minUnit }}<br>
+        {{ t.today }}{{ dfTodayCount }} {{ t.timesAccum }} {{ Math.floor(dfTodayDurS / 3600) }}{{ t.hourUnit }} {{ Math.floor((dfTodayDurS % 3600) / 60) }}{{ t.minUnit }}
       </div>
-      <h3>Artificial Neural Network</h3>
+      <h3>{{ t.ann }}</h3>
       <canvas id="NULD2410Chart"></canvas>
     </div>
 
@@ -146,23 +149,23 @@
       <table v-if="!isFirmwareUpgrading && !isRebooting" width="300" border="0">
         <tbody>
           <tr>
-            <td>Auto Learning&nbsp;</td>
+            <td>{{ t.autoLearning }}&nbsp;</td>
           </tr>
           <tr>
             <td>
-              <button @click="fetchData(101)" :disabled="isResetDisabled">Reset</button>
-              <button @click="fetchData(104)" :disabled="isSaveDisabled">Save</button>
-              <button @click="downloadWeights()">Download</button>
+              <button @click="fetchData(101)" :disabled="isResetDisabled">{{ t.btnReset }}</button>
+              <button @click="fetchData(104)" :disabled="isSaveDisabled">{{ t.btnSave }}</button>
+              <button @click="downloadWeights()">{{ t.btnDownload }}</button>
               <input type="file" ref="weightsFile" @change="uploadWeights" accept=".json" style="display:none">
-              <button @click="$refs.weightsFile.click()">Upload</button>
+              <button @click="$refs.weightsFile.click()">{{ t.btnUpload }}</button>
             </td>
           </tr>
           <tr>
             <td>
-              <button v-if="showStillButton" @click="fetchData(203)" :disabled="isLearnStillDisabled">Stillness</button>
-              <button v-if="showSoBodyButton" @click="fetchData(201)" :disabled="isLearnSoBodyDisabled">Someone</button>
-              <button v-if="showNoBodyButton" @click="fetchData(202)" :disabled="isLearnNoBodyDisabled">Noone</button>
-              <button v-if="showStopButton" @click="fetchData(204)" :disabled="isStopDisabled">Stop</button>
+              <button v-if="showStillButton" @click="fetchData(203)" :disabled="isLearnStillDisabled">{{ t.btnStillness }}</button>
+              <button v-if="showSoBodyButton" @click="fetchData(201)" :disabled="isLearnSoBodyDisabled">{{ t.btnSomeone }}</button>
+              <button v-if="showNoBodyButton" @click="fetchData(202)" :disabled="isLearnNoBodyDisabled">{{ t.btnNoone }}</button>
+              <button v-if="showStopButton" @click="fetchData(204)" :disabled="isStopDisabled">{{ t.btnStop }}</button>
             </td>
           </tr>
         </tbody>
@@ -171,15 +174,14 @@
       <table v-if="!isFirmwareUpgrading && !isRebooting" width="300" border="0">
         <tbody>
           <tr>
-            <td>System Functions&nbsp;</td>
+            <td>{{ t.systemFunctions }}&nbsp;</td>
           </tr>
           <tr>
             <td>
-              <button v-if="!isFirmwareUpgrading" @click="fetchData(401)" :disabled="isFirmwareUpgradeDisabled">Firmware
-                Upgrade</button>
-              <button v-if="!isFirmwareUpgrading" @click="fetchData(501)" :disabled="isRebootDisabled">Reboot</button>
-              <button @click="fetchData(502)" :disabled="isFirmwareUpgrading || isEraseDataDisabled">Erase Data</button>
-              <button v-if="showAirQuality" @click="fetchData(602)">Reset Base</button>
+              <button v-if="!isFirmwareUpgrading" @click="fetchData(401)" :disabled="isFirmwareUpgradeDisabled">{{ t.btnFirmwareUpgrade }}</button>
+              <button v-if="!isFirmwareUpgrading" @click="fetchData(501)" :disabled="isRebootDisabled">{{ t.btnReboot }}</button>
+              <button @click="fetchData(502)" :disabled="isFirmwareUpgrading || isEraseDataDisabled">{{ t.btnEraseData }}</button>
+              <button v-if="showAirQuality" @click="fetchData(602)">{{ t.btnResetBase }}</button>
             </td>
           </tr>
         </tbody>
@@ -188,48 +190,48 @@
 
     <div class="section" v-show="showConfig">
       <form @submit.prevent="submitForm">
-        <label for="firmwareIp">Firmware Server:</label>
+        <label for="firmwareIp">{{ t.firmwareServer }}</label>
         <input type="text" v-model="form.firmwareIp" id="firmwareIp">:8443/
         <input type="text" v-model="form.firmwareFilename" id="firmwareFilename"><br><br>
 
-        <label for="ThingSpeak">ThingSpeak APIKEY</label>
+        <label for="ThingSpeak">{{ t.thingspeakApikey }}</label>
         <input type="text" v-model="form.apikey" id="apikey"><br><br>
 
-        <label for="mq135">VOC Threshold:<br> High</label>
-        <input type="number" v-model="form.mq135high" id="mq135high"> <br> Low
+        <label for="mq135">{{ t.vocThreshold }}<br> {{ t.high }}</label>
+        <input type="number" v-model="form.mq135high" id="mq135high"> <br> {{ t.low }}
         <input type="number" v-model="form.mq135low" id="mq135low"> <br><br>
 
-        <label for="sgp41nox">NOx Threshold:<br> High</label>
-        <input type="number" v-model="form.sgp41noxhigh" id="sgp41noxhigh"> <br> Low
+        <label for="sgp41nox">{{ t.noxThreshold }}<br> {{ t.high }}</label>
+        <input type="number" v-model="form.sgp41noxhigh" id="sgp41noxhigh"> <br> {{ t.low }}
         <input type="number" v-model="form.sgp41noxlow" id="sgp41noxlow"> <br><br>
 
-        <label>排風排程：每 <input type="number" v-model="form.fsInterval" style="width:60px"> 分鐘，排風 <input type="number" v-model="form.fsRun" style="width:60px"> 分鐘</label><br>
-        啟用排程：<input type="checkbox" v-model="form.fsEnabled"><br><br>
+        <label>{{ t.fanSchEvery }} <input type="number" v-model="form.fsInterval" style="width:60px"> {{ t.fanSchRun }} <input type="number" v-model="form.fsRun" style="width:60px"> {{ t.fanSchMin }}</label><br>
+        {{ t.fanSchEnable }}<input type="checkbox" v-model="form.fsEnabled"><br><br>
 
-        <label for="dht22temp">Temperature Threshold:<br> High</label>
-        <input type="number" v-model="form.temphigh" id="temphigh"> (°C)<br> Low
+        <label for="dht22temp">{{ t.tempThreshold }}<br> {{ t.high }}</label>
+        <input type="number" v-model="form.temphigh" id="temphigh"> (°C)<br> {{ t.low }}
         <input type="number" v-model="form.templow" id="templow"> (°C)<br><br>
 
-        <label for="dht22humi">Humidity Threshold:<br> High</label>
-        <input type="number" v-model="form.humihigh" id="humihigh"> (%)<br> Low
+        <label for="dht22humi">{{ t.humiThreshold }}<br> {{ t.high }}</label>
+        <input type="number" v-model="form.humihigh" id="humihigh"> (%)<br> {{ t.low }}
         <input type="number" v-model="form.humilow" id="humilow"> (%)<br><br>
 
-        <label for="OLED">LED ECO:<br> Display Time</label>
-        <input type="number" v-model="form.leddisplay" id="leddisplay"> (sec.)<br> Snooze Time
-        <input type="number" v-model="form.ledsnooze" id="ledsnooze"> (sec.)<br><br>
+        <label for="OLED">{{ t.ledEco }}<br> {{ t.displayTime }}</label>
+        <input type="number" v-model="form.leddisplay" id="leddisplay"> ({{ t.seconds }})<br> {{ t.snoozeTime }}
+        <input type="number" v-model="form.ledsnooze" id="ledsnooze"> ({{ t.seconds }})<br><br>
 
-        <label for="syslogIp">Syslog IP:</label>
+        <label for="syslogIp">{{ t.syslogIp }}</label>
         <input type="text" v-model="form.syslogIp" id="syslogIp"><br><br>
 
-        <label for="RLOG">Remote Log Status:</label>
+        <label for="RLOG">{{ t.remoteLogStatus }}</label>
         <table>
           <tr>
-            <td>Function</td>
-            <td>Debug</td>
-            <td>Info</td>
-            <td>Warning</td>
-            <td>Alert</td>
-            <td>Error</td>
+            <td>{{ t.logFunction }}</td>
+            <td>{{ t.logDebug }}</td>
+            <td>{{ t.logInfo }}</td>
+            <td>{{ t.logWarning }}</td>
+            <td>{{ t.logAlert }}</td>
+            <td>{{ t.logError }}</td>
           </tr>
           <tr>
             <td>
@@ -263,7 +265,7 @@
           </tr>
         </table>
 
-        <button type="submit">Submit</button>
+        <button type="submit">{{ t.btnSubmit }}</button>
       </form>
     </div>
 
@@ -271,7 +273,7 @@
       <table v-if="!isFirmwareUpgrading && !isRebooting" width="300" border="0">
         <tbody>
           <tr>
-            <td>Auto Learning Input</td>
+            <td>{{ t.autoLearningInput }}</td>
           </tr>
         </tbody>
       </table>
@@ -281,7 +283,7 @@
       <table width="300" border="0">
         <tbody>
           <tr>
-            <td>Firmware Upgrade Progress</td>
+            <td>{{ t.firmwareUpgradeProgress }}</td>
           </tr>
           <tr>
             <td>
@@ -299,9 +301,115 @@
   </div>
 
   <script>
+    const translations = {
+      zh: {
+        langToggle: 'EN',
+        buildVersion: '韌體版本：',
+        annModel: '人工神經網路模型：前饋神經網路',
+        temperature: '溫度：', humidity: '濕度：',
+        airQualityVoc: '空氣品質 (VOC)：',
+        sensorError: '感測器錯誤',
+        limitGe: '上限 >=', smokeGe: '煙霧 >=',
+        noxIndex: 'NOx 指數：',
+        history: '歷史紀錄',
+        fanStats: '排風扇統計',
+        yesterday: '昨日：', today: '今日：',
+        timesAccum: '次，累積', hourUnit: '時', minUnit: '分',
+        ann: '人工神經網路',
+        autoLearning: '自動學習',
+        btnReset: '重置', btnSave: '儲存', btnDownload: '下載', btnUpload: '上傳',
+        btnStillness: '靜止', btnSomeone: '有人', btnNoone: '無人', btnStop: '停止',
+        systemFunctions: '系統功能',
+        btnFirmwareUpgrade: '韌體更新', btnReboot: '重開機',
+        btnEraseData: '清除資料', btnResetBase: '重置基準',
+        firmwareServer: '韌體伺服器：',
+        thingspeakApikey: 'ThingSpeak API 金鑰',
+        vocThreshold: 'VOC 閾值：', noxThreshold: 'NOx 閾值：',
+        high: '高', low: '低',
+        fanSchEvery: '排風排程：每', fanSchRun: '分鐘，排風', fanSchMin: '分鐘',
+        fanSchEnable: '啟用排程：',
+        tempThreshold: '溫度閾值：', humiThreshold: '濕度閾值：',
+        ledEco: 'LED 節能：', displayTime: '顯示時間', snoozeTime: '休眠時間', seconds: '秒',
+        syslogIp: 'Syslog IP：',
+        remoteLogStatus: '遠端日誌狀態：',
+        logFunction: '功能', logDebug: '除錯', logInfo: '資訊',
+        logWarning: '警告', logAlert: '警示', logError: '錯誤',
+        btnSubmit: '送出',
+        autoLearningInput: '自動學習輸入',
+        firmwareUpgradeProgress: '韌體更新進度',
+        fanManual: '手動', fanExhaust: '排風', fanWarm: '暖風', fanDry: '乾燥',
+        fanOff: '關閉', fanStatusLabel: '風扇狀態：', fanStatusSep: '、',
+        chartTemp: '溫度 (°C)', chartHumi: '濕度 (%)', chartAQ: '空氣品質',
+        chartNox: 'NOx 指數', chartPred: '預測值', chartTime: '時間', chartValue: '數值',
+        otaFailed: '韌體更新失敗',
+        otaRebooting: (s) => `重開機中，請稍候（${s} 秒）`,
+        otaErasing: '清除 NVS，請稍候（15 秒）',
+        downloadFailed: '下載模型權重失敗',
+        invalidWeights: '無效的權重檔案：缺少必要欄位（w_ih, w_ho, b_h, b_o）',
+        uploadSuccess: '模型權重已成功上傳至記憶體！\n請按「儲存」以寫入快閃記憶體。',
+        uploadFailed: '上傳模型權重失敗：',
+        uploadError: '上傳模型權重發生錯誤：',
+        downloadError: '下載模型權重發生錯誤：',
+        invalidJson: '無效的 JSON 檔案：',
+        unknown: '未知',
+      },
+      en: {
+        langToggle: '繁中',
+        buildVersion: 'Build Version: ',
+        annModel: 'Artificial Neural Network Model: Feedforward Neural Network',
+        temperature: 'Temperature: ', humidity: 'Humidity: ',
+        airQualityVoc: 'Air Quality (VOC): ',
+        sensorError: 'Sensor Error',
+        limitGe: 'Limit >=', smokeGe: 'Smoke >=',
+        noxIndex: 'NOx Index: ',
+        history: 'History',
+        fanStats: 'Exhaust Fan Stats',
+        yesterday: 'Yesterday: ', today: 'Today: ',
+        timesAccum: 'times,', hourUnit: 'h', minUnit: 'm',
+        ann: 'Artificial Neural Network',
+        autoLearning: 'Auto Learning',
+        btnReset: 'Reset', btnSave: 'Save', btnDownload: 'Download', btnUpload: 'Upload',
+        btnStillness: 'Stillness', btnSomeone: 'Someone', btnNoone: 'Noone', btnStop: 'Stop',
+        systemFunctions: 'System Functions',
+        btnFirmwareUpgrade: 'Firmware Upgrade', btnReboot: 'Reboot',
+        btnEraseData: 'Erase Data', btnResetBase: 'Reset Base',
+        firmwareServer: 'Firmware Server: ',
+        thingspeakApikey: 'ThingSpeak APIKEY',
+        vocThreshold: 'VOC Threshold: ', noxThreshold: 'NOx Threshold: ',
+        high: 'High', low: 'Low',
+        fanSchEvery: 'Exhaust Schedule: every', fanSchRun: 'min, run', fanSchMin: 'min',
+        fanSchEnable: 'Enable Schedule: ',
+        tempThreshold: 'Temperature Threshold: ', humiThreshold: 'Humidity Threshold: ',
+        ledEco: 'LED ECO: ', displayTime: 'Display Time', snoozeTime: 'Snooze Time', seconds: 'sec.',
+        syslogIp: 'Syslog IP: ',
+        remoteLogStatus: 'Remote Log Status: ',
+        logFunction: 'Function', logDebug: 'Debug', logInfo: 'Info',
+        logWarning: 'Warning', logAlert: 'Alert', logError: 'Error',
+        btnSubmit: 'Submit',
+        autoLearningInput: 'Auto Learning Input',
+        firmwareUpgradeProgress: 'Firmware Upgrade Progress',
+        fanManual: 'Manual', fanExhaust: 'Exhaust', fanWarm: 'Warm', fanDry: 'Dry',
+        fanOff: 'Off', fanStatusLabel: 'Fan Status: ', fanStatusSep: ', ',
+        chartTemp: 'Temperature (°C)', chartHumi: 'Humidity (%)', chartAQ: 'Air Quality',
+        chartNox: 'NOx Index', chartPred: 'Prediction', chartTime: 'Time', chartValue: 'Value',
+        otaFailed: 'Firmware Upgrade failed',
+        otaRebooting: (s) => `Rebooting, Please Wait (${s} sec.)`,
+        otaErasing: 'Erase NVS, Please Wait (15 sec.)',
+        downloadFailed: 'Failed to download weights',
+        invalidWeights: 'Invalid weights file: missing required fields (w_ih, w_ho, b_h, b_o)',
+        uploadSuccess: 'Weights uploaded to memory successfully!\nPress "Save" to persist to flash.',
+        uploadFailed: 'Failed to upload weights: ',
+        uploadError: 'Error uploading weights: ',
+        downloadError: 'Error downloading weights: ',
+        invalidJson: 'Invalid JSON file: ',
+        unknown: 'Unknown',
+      }
+    };
+
     new Vue({
       el: '#app',
       data: {
+        lang: localStorage.getItem('lang') || 'zh',
         sysBuildversion: '',
         sysBuildTime: '',
         sysMacaddress: '',
@@ -413,6 +521,7 @@
         }
       },
       computed: {
+        t() { return translations[this.lang]; },
         showAirQuality() {
           return this.mq135thresholdhigh !== 0 || this.mq135thresholdlow !== 0 || this.mq135currentdata !== 0;
         }
@@ -439,7 +548,7 @@
               labels: [],
               datasets: [
                 {
-                  label: "Temperature (°C)",
+                  label: this.t.chartTemp,
                   data: [],
                   borderColor: "#f44336",
                   backgroundColor: "rgba(244,67,54,0.2)",
@@ -447,7 +556,14 @@
                   fill: true
                 },
                 {
-                  label: "Air Quality",
+                  label: this.t.chartHumi,
+                  data: [],
+                  borderColor: "#2196F3",
+                  backgroundColor: "rgba(33,150,243,0.2)",
+                  fill: true
+                },
+                {
+                  label: this.t.chartAQ,
                   data: [],
                   borderColor: "#ff9800",
                   backgroundColor: "rgba(255,152,0,0.2)",
@@ -455,14 +571,7 @@
                   fill: true
                 },
                 {
-                  label: "Humidity (%)",
-                  data: [],
-                  borderColor: "#2196F3",
-                  backgroundColor: "rgba(33,150,243,0.2)",
-                  fill: true
-                },
-                {
-                  label: "NOx Index",
+                  label: this.t.chartNox,
                   data: [],
                   borderColor: "#9C27B0",
                   backgroundColor: "rgba(156, 39, 176, 0.2)",
@@ -495,12 +604,12 @@
                 ctx.textAlign = "right";
                 const fanFlags = this.deltafanscheduler || [];
                 const statusList = [];
-                if (fanFlags[0] === 2) statusList.push("Manual");
-                if (fanFlags[1] === 2) statusList.push("Exhaust");
-                if (fanFlags[2] === 2) statusList.push("Warm");
-                if (fanFlags[3] === 2) statusList.push("Dry");
-                if (fanFlags[4] === 2) statusList.push("HomeKit");
-                const displayText = "Fan Status: " + (statusList.length > 0 ? statusList.join(", ") : "Off");
+                if (fanFlags[0] === 2) statusList.push(this.t.fanManual);
+                if (fanFlags[1] === 2) statusList.push(this.t.fanExhaust);
+                if (fanFlags[2] === 2) statusList.push(this.t.fanWarm);
+                if (fanFlags[3] === 2) statusList.push(this.t.fanDry);
+                if (fanFlags[4] === 2) statusList.push('HomeKit');
+                const displayText = this.t.fanStatusLabel + (statusList.length > 0 ? statusList.join(this.t.fanStatusSep) : this.t.fanOff);
                 ctx.fillText(displayText, right - 10, top + 20);
                 ctx.restore();
               }
@@ -514,7 +623,7 @@
               labels: [],
               datasets: [
                 {
-                  label: "Prediction",
+                  label: this.t.chartPred,
                   data: [],
                   backgroundColor: [],
                   borderWidth: 1
@@ -524,8 +633,8 @@
             options: {
               responsive: true,
               scales: {
-                x: { title: { display: true, text: "Time" } },
-                y: { title: { display: true, text: "Value" }, min: 0, max: 1 }
+                x: { title: { display: true, text: this.t.chartTime } },
+                y: { title: { display: true, text: this.t.chartValue }, min: 0, max: 1 }
               }
             }
           });
@@ -551,7 +660,7 @@
 
           // 1. Temperature
           targetDatasets.push({
-            label: "Temperature (°C)",
+            label: this.t.chartTemp,
             data: this.temperatureData,
             borderColor: "#f44336",
             backgroundColor: "rgba(244,67,54,0.2)",
@@ -559,10 +668,19 @@
             fill: true
           });
 
-          // 2. Air Quality (Conditional)
+          // 2. Humidity
+          targetDatasets.push({
+            label: this.t.chartHumi,
+            data: this.humidityData,
+            borderColor: "#2196F3",
+            backgroundColor: "rgba(33,150,243,0.2)",
+            fill: true
+          });
+
+          // 3. Air Quality (Conditional)
           if (this.showAirQuality) {
             targetDatasets.push({
-              label: "Air Quality",
+              label: this.t.chartAQ,
               data: this.airQualityData,
               borderColor: "#ff9800",
               backgroundColor: "rgba(255,152,0,0.2)",
@@ -571,19 +689,10 @@
             });
           }
 
-          // 3. Humidity
-          targetDatasets.push({
-            label: "Humidity (%)",
-            data: this.humidityData,
-            borderColor: "#2196F3",
-            backgroundColor: "rgba(33,150,243,0.2)",
-            fill: true
-          });
-
           // 4. NOx (Conditional)
           if (this.showAirQuality && this.sgp41nox !== undefined) {
             targetDatasets.push({
-              label: "NOx Index",
+              label: this.t.chartNox,
               data: this.sgp41noxData,
               borderColor: "#9C27B0",
               backgroundColor: "rgba(156, 39, 176, 0.2)",
@@ -707,7 +816,8 @@
           this.isEraseDataDisabled = false;
           this.showConfig = true;
         },
-        handleOtaFailure(message = 'Firmware Upgrade failed') {
+        handleOtaFailure(message) {
+          if (!message) message = this.t.otaFailed;
           this.restoreIdleControls();
           this.applyLearnStatus();
           this.showOTAProgressBar = false;
@@ -720,7 +830,8 @@
             window.alert(message);
           }
         },
-        processOtaProgressSample(percent, message = 'Firmware Upgrade failed') {
+        processOtaProgressSample(percent, message) {
+          if (!message) message = this.t.otaFailed;
           if (percent < 0) {
             this.otaFailureCount += 1;
             if (this.otaFailureCount >= this.otaFailureThreshold) {
@@ -754,10 +865,10 @@
                 const action_status = data['action-status'];
                 switch (action_type) {
                   case 1:
-                    this.sysBuildversion = data.sysBuildversion || 'Unknown';
-                    this.sysBuildTime = data.sysBuildTime || 'Unknown';
-                    this.sysMacaddress = data.sysMacaddress || 'Unknown';
-                    this.sysIPaddress = data.sysIPaddress || 'Unknown';
+                    this.sysBuildversion = data.sysBuildversion || this.t.unknown;
+                    this.sysBuildTime = data.sysBuildTime || this.t.unknown;
+                    this.sysMacaddress = data.sysMacaddress || this.t.unknown;
+                    this.sysIPaddress = data.sysIPaddress || this.t.unknown;
                     this.sysOffthreshold = data.sysOffthreshold || 0;
                     this.mq135currentdata = data.mq135currentdata || 0;
                     if (data.sgp41nox !== undefined) this.sgp41nox = data.sgp41nox;
@@ -796,7 +907,7 @@
                     }
                     let canUpdateOtaUi = true;
                     if (isOtaInProgress) {
-                      canUpdateOtaUi = this.processOtaProgressSample(otaPercentRaw, 'Firmware Upgrade failed');
+                      canUpdateOtaUi = this.processOtaProgressSample(otaPercentRaw);
                     } else {
                       this.otaFailureCount = 0;
                     }
@@ -907,7 +1018,7 @@
                     }
                     let canUpdateOtaUi401 = true;
                     if (status === 1) {
-                      canUpdateOtaUi401 = this.processOtaProgressSample(percentStart, 'Firmware Upgrade failed');
+                      canUpdateOtaUi401 = this.processOtaProgressSample(percentStart);
                     } else {
                       this.otaFailureCount = 0;
                     }
@@ -936,7 +1047,7 @@
                     this.sysFirmwareupgradestatus = status;
                     let canUpdateOtaUi402 = true;
                     if (status === 1) {
-                      canUpdateOtaUi402 = this.processOtaProgressSample(percent, 'Firmware Upgrade failed');
+                      canUpdateOtaUi402 = this.processOtaProgressSample(percent);
                     } else {
                       this.otaFailureCount = 0;
                     }
@@ -952,7 +1063,7 @@
                       this.otaPercent = percent;
                       this.otaPercentText = `${this.otaPercent}%`;
                       if (this.otaPercent >= 100) {
-                        this.otaPercentText = `Rebooting, Please Wait (${this.otaCountdown || 0} sec.)`;
+                        this.otaPercentText = this.t.otaRebooting(this.otaCountdown || 0);
                       }
                     } else if (canUpdateOtaUi402 && !this.isRebooting) {
                       this.restoreIdleControls();
@@ -960,7 +1071,7 @@
                       this.applyLearnStatus();
                       this.otaPercent = Math.max(percent, 0);
                       if (this.otaPercent >= 100) {
-                        this.otaPercentText = `Rebooting, Please Wait (${this.otaCountdown || 0} sec.)`;
+                        this.otaPercentText = this.t.otaRebooting(this.otaCountdown || 0);
                       } else {
                         this.otaPercentText = `${this.otaPercent}%`;
                       }
@@ -986,7 +1097,7 @@
                     this.isRebootDisabled = true;
                     this.isEraseDataDisabled = true;
                     this.otaPercent = 100;
-                    this.otaPercentText = "Rebooting, Please Wait (15 sec.)";
+                    this.otaPercentText = this.t.otaRebooting(15);
                     this.startCountdown();
                     break;
                   case 502:
@@ -1008,7 +1119,7 @@
                     this.isFirmwareUpgradeDisabled = true;
                     this.isRebootDisabled = true;
                     this.otaPercent = 100;
-                    this.otaPercentText = "Erase NVS, Please Wait (15 sec.)";
+                    this.otaPercentText = this.t.otaErasing;
                     this.startCountdown();
                     break;
                   case 601: {
@@ -1199,7 +1310,7 @@
           const countdownInterval = setInterval(() => {
             if (this.otaCountdown > 0) {
               this.otaCountdown--;
-              this.otaPercentText = `Rebooting, Please Wait (${this.otaCountdown} sec.)`;
+              this.otaPercentText = this.t.otaRebooting(this.otaCountdown);
             } else {
               clearInterval(countdownInterval);
               location.reload();
@@ -1246,12 +1357,12 @@
                 URL.revokeObjectURL(url);
                 console.log('Weights downloaded successfully');
               } else {
-                alert('Failed to download weights');
+                alert(this.t.downloadFailed);
               }
             })
             .catch(error => {
               console.error('Error downloading weights:', error);
-              alert('Error downloading weights: ' + error.message);
+              alert(this.t.downloadError + error.message);
             });
         },
         uploadWeights(event) {
@@ -1267,7 +1378,7 @@
 
               // Validate required fields
               if (!weightsData.w_ih || !weightsData.w_ho || !weightsData.b_h || !weightsData.b_o) {
-                alert('Invalid weights file: missing required fields (w_ih, w_ho, b_h, b_o)');
+                alert(this.t.invalidWeights);
                 return;
               }
 
@@ -1280,28 +1391,47 @@
                 .then(response => response.json())
                 .then(data => {
                   if (data.status === 'success') {
-                    alert('Weights uploaded to memory successfully!\nPress "Save" to persist to flash.');
+                    alert(this.t.uploadSuccess);
                     console.log('Weights uploaded:', data.message);
                   } else {
-                    alert('Failed to upload weights: ' + (data.message || 'Unknown error'));
+                    alert(this.t.uploadFailed + (data.message || this.t.unknown));
                   }
                 })
                 .catch(error => {
                   console.error('Error uploading weights:', error);
-                  alert('Error uploading weights: ' + error.message);
+                  alert(this.t.uploadError + error.message);
                 });
             } catch (parseError) {
               console.error('Error parsing weights file:', parseError);
-              alert('Invalid JSON file: ' + parseError.message);
+              alert(this.t.invalidJson + parseError.message);
             }
           };
           reader.readAsText(file);
 
           // Reset file input so the same file can be selected again
           event.target.value = '';
+        },
+        toggleLang() {
+          this.lang = this.lang === 'zh' ? 'en' : 'zh';
+        },
+        updateChartLabels() {
+          if (this.ENVchart) {
+            this.ENVchart.data.datasets.forEach(ds => { ds.label = ''; });
+            this.ENVchart.update();
+          }
+          if (this.NULD2410chart) {
+            this.NULD2410chart.data.datasets[0].label = this.t.chartPred;
+            this.NULD2410chart.options.scales.x.title.text = this.t.chartTime;
+            this.NULD2410chart.options.scales.y.title.text = this.t.chartValue;
+            this.NULD2410chart.update();
+          }
         }
       },
       watch: {
+        lang(val) {
+          localStorage.setItem('lang', val);
+          this.updateChartLabels();
+        },
         otaPercent(newVal) {
           if (!this.isFirmwareUpgrading) {
             return;
