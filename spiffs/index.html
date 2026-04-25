@@ -198,6 +198,9 @@
         <input type="number" v-model="form.sgp41noxhigh" id="sgp41noxhigh"> <br> Low
         <input type="number" v-model="form.sgp41noxlow" id="sgp41noxlow"> <br><br>
 
+        <label>排風排程：每 <input type="number" v-model="form.fsInterval" style="width:60px"> 分鐘，排風 <input type="number" v-model="form.fsRun" style="width:60px"> 分鐘</label><br>
+        啟用排程：<input type="checkbox" v-model="form.fsEnabled"><br><br>
+
         <label for="dht22temp">Temperature Threshold:<br> High</label>
         <input type="number" v-model="form.temphigh" id="temphigh"> (°C)<br> Low
         <input type="number" v-model="form.templow" id="templow"> (°C)<br><br>
@@ -306,6 +309,9 @@
         sgp41noxhigh: 0,
         sgp41noxlow: 0,
         deltafanscheduler: [],
+        fsInterval: 30,
+        fsRun: 10,
+        fsEnabled: false,
         airQualityData: [],
         airQualityLabels: [],
         sgp41noxData: [],
@@ -379,6 +385,9 @@
           mq135low: '',
           sgp41noxhigh: '',
           sgp41noxlow: '',
+          fsInterval: '',
+          fsRun: '',
+          fsEnabled: false,
           temphigh: '',
           templow: '',
           humihigh: '',
@@ -814,6 +823,9 @@
                     this.form.mq135low = String(this.mq135thresholdlow || this.form.mq135low || '');
                     this.form.sgp41noxhigh = String(this.sgp41noxhigh || this.form.sgp41noxhigh || '');
                     this.form.sgp41noxlow = String(this.sgp41noxlow || this.form.sgp41noxlow || '');
+                    if (Object.prototype.hasOwnProperty.call(data, 'fsInterval')) { this.fsInterval = data.fsInterval; this.form.fsInterval = String(data.fsInterval); }
+                    if (Object.prototype.hasOwnProperty.call(data, 'fsRun')) { this.fsRun = data.fsRun; this.form.fsRun = String(data.fsRun); }
+                    if (Object.prototype.hasOwnProperty.call(data, 'fsEnabled')) { this.fsEnabled = !!data.fsEnabled; this.form.fsEnabled = !!data.fsEnabled; }
                     this.form.temphigh = String(this.dht22thresholdtemphigh || this.form.temphigh || '');
                     this.form.templow = String(this.dht22thresholdtemplow || this.form.templow || '');
                     this.form.humihigh = String(this.dht22thresholdhumihigh || this.form.humihigh || '');
@@ -1003,6 +1015,9 @@
                     if (Array.isArray(data.deltafanscheduler)) {
                       this.deltafanscheduler = data.deltafanscheduler;
                     }
+                    if (hasField('fsInterval')) { this.fsInterval = data.fsInterval; }
+                    if (hasField('fsRun')) { this.fsRun = data.fsRun; }
+                    if (hasField('fsEnabled')) { this.fsEnabled = !!data.fsEnabled; }
                     if (hasField('dht22currenttemp')) {
                       this.dht22currenttemp = data.dht22currenttemp;
                     }

@@ -144,14 +144,15 @@ extern "C" {
 #define IR_DELTA_FAN_TIGGER_ACTIVE_ON       1
 #define IR_DELTA_FAN_TIGGER_ACTIVE_OFF      2
 
-/* Defined based on priority */
+/* Defined based on priority (lower index = higher preemption) */
 #define IR_DELTA_FAN_TIGGER_MODE_MANUAL   0
 #define IR_DELTA_FAN_TIGGER_MODE_EXHAUST  1
 #define IR_DELTA_FAN_TIGGER_MODE_WARM     2
 #define IR_DELTA_FAN_TIGGER_MODE_DRY      3
 #define IR_DELTA_FAN_TIGGER_MODE_HOMEKIT  4
-#define IR_DELTA_FAN_TIGGER_MODE_OFF      5
-#define IR_DELTA_FAN_TIGGER_MODE_MAX      6
+#define IR_DELTA_FAN_TIGGER_MODE_SCHEDULE 5  // Lowest priority: periodic auto-ventilation
+#define IR_DELTA_FAN_TIGGER_MODE_OFF      6
+#define IR_DELTA_FAN_TIGGER_MODE_MAX      7
 
 #define IR_DELTA_FAN_DURATION_HALF_HOUR   0
 #define IR_DELTA_FAN_DURATION_1HR         1

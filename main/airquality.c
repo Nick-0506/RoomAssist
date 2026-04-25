@@ -21,6 +21,7 @@
 // Drivers & Components
 #include "rmt.h"
 #include "ir_delta_encoder.h"
+#include "fan_schedule.h"
 #include "mq135.h"
 #include "dht22.h"
 #if CONFIG_SGP41_ENABLE
@@ -300,6 +301,8 @@ void task_airquality(void *arg)
     mq135_adc_init();
 #endif
 
+    fan_schedule_init();
+
     // Warmup
     system_task_created(TASK_MQ135_ID);
     vTaskDelay(pdMS_TO_TICKS(AQ_WARMTIME));
@@ -464,5 +467,7 @@ void task_airquality(void *arg)
                 }
             }
         }
+
+        fan_schedule_tick();
     }
 }

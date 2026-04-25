@@ -8,6 +8,7 @@
 #include "dht22.h"
 #include "esp_log.h"
 #include "esp_wifi.h"
+#include "fan_schedule.h"
 #include "homekit.h"
 #include "ld2410.h"
 #include "airquality.h"
@@ -39,6 +40,7 @@ static esp_err_t http_api_loading(httpd_req_t *req);
 static esp_err_t http_api_reboot(httpd_req_t *req);
 static esp_err_t http_api_env_updt(httpd_req_t *req);
 static esp_err_t http_api_reset_baseline(httpd_req_t *req);
+static esp_err_t http_api_fan_schedule_updt(httpd_req_t *req);
 static int http_printf_end(httpd_req_t *req);
 static int http_printf(httpd_req_t *req, const char *fmt, ...);
 static esp_err_t handle_nu_upload(httpd_req_t *req);
@@ -204,6 +206,11 @@ esp_err_t fetch_vue(httpd_req_t *req)
                     break;
                 case HTTP_RESET_BASELINE_ID:
                     http_api_reset_baseline(req);
+                    http_printf(req, "\"action-status\": %d}",
+                                HTTP_ACTION_STATUS_SUCCESS);
+                    break;
+                case HTTP_FAN_SCHEDULE_UPDT:
+                    http_api_fan_schedule_updt(req);
                     http_printf(req, "\"action-status\": %d}",
                                 HTTP_ACTION_STATUS_SUCCESS);
                     break;
@@ -383,6 +390,7 @@ esp_err_t handle_submitform(httpd_req_t *req)
     int mq135low = 0;
     int sgp41noxhigh = 0;
     int sgp41noxlow = 0;
+    int fsinterval = 0, fsrun = 0, fsenabled = 0;
     int temphigh = 0;
     int templow = 0;
     int humihigh = 0;
@@ -463,6 +471,9 @@ esp_err_t handle_submitform(httpd_req_t *req)
         handle_json_get_int(content, &mq135low, "\"mq135low\"");
         handle_json_get_int(content, &sgp41noxhigh, "\"sgp41noxhigh\"");
         handle_json_get_int(content, &sgp41noxlow, "\"sgp41noxlow\"");
+        handle_json_get_int(content, &fsinterval, "\"fsInterval\"");
+        handle_json_get_int(content, &fsrun, "\"fsRun\"");
+        handle_json_get_bool(content, &fsenabled, "\"fsEnabled\"");
     }
     handle_json_get_int(content, &temphigh, "\"temphigh\"");
     handle_json_get_int(content, &templow, "\"templow\"");
@@ -620,6 +631,10 @@ esp_err_t handle_submitform(httpd_req_t *req)
         if (sgp41noxlow != orgsgp41noxlow)
         {
             airquality_set_nox_threshold_low(sgp41noxlow);
+        }
+        if (fsinterval > 0 || fsrun > 0)
+        {
+            fan_schedule_set_config((uint32_t)fsinterval, (uint32_t)fsrun, (bool)fsenabled);
         }
     }
 
@@ -804,6 +819,17 @@ static esp_err_t http_api_reset_baseline(httpd_req_t *req)
     return ESP_OK;
 }
 
+static esp_err_t http_api_fan_schedule_updt(httpd_req_t *req)
+{
+    uint32_t fs_interval = 0, fs_run = 0;
+    bool fs_enabled = false;
+    fan_schedule_get_config(&fs_interval, &fs_run, &fs_enabled);
+    http_printf(req, "\"fsInterval\": %lu,", fs_interval);
+    http_printf(req, "\"fsRun\": %lu,", fs_run);
+    http_printf(req, "\"fsEnabled\": %d,", (int)fs_enabled);
+    return ESP_OK;
+}
+
 static esp_err_t http_api_env_updt(httpd_req_t *req)
 {
     int i = 0, temphigh = 0, templow = 0, humihigh = 0, humilow = 0;
@@ -841,6 +867,12 @@ static esp_err_t http_api_env_updt(httpd_req_t *req)
         }
         ir_get_deltascheduler(i, &scheduler);
         http_printf(req, "%d],", scheduler);
+        uint32_t fs_interval = 0, fs_run = 0;
+        bool fs_enabled = false;
+        fan_schedule_get_config(&fs_interval, &fs_run, &fs_enabled);
+        http_printf(req, "\"fsInterval\": %lu,", fs_interval);
+        http_printf(req, "\"fsRun\": %lu,", fs_run);
+        http_printf(req, "\"fsEnabled\": %d,", (int)fs_enabled);
     }
     dht22_getcurrenttemperature(&temperature);
     dht22_getcurrenthumidity(&humidity);
@@ -968,6 +1000,12 @@ static esp_err_t http_api_loading(httpd_req_t *req)
         }
         ir_get_deltascheduler(i, &scheduler);
         http_printf(req, "%d],", scheduler);
+        uint32_t fs_interval_l = 0, fs_run_l = 0;
+        bool fs_enabled_l = false;
+        fan_schedule_get_config(&fs_interval_l, &fs_run_l, &fs_enabled_l);
+        http_printf(req, "\"fsInterval\": %lu,", fs_interval_l);
+        http_printf(req, "\"fsRun\": %lu,", fs_run_l);
+        http_printf(req, "\"fsEnabled\": %d,", (int)fs_enabled_l);
     }
     dht22_getcurrenttemperature(&temperature);
     dht22_getcurrenthumidity(&humidity);
@@ -1354,6 +1392,8 @@ static void http_view_display_input_table(httpd_req_t *req)
         http_printf(req, "<label for=\"mq135\">Air Quality Threshold:<br> High</label>");
         http_printf(req, "<input type=\"number\" v-model=\"form.mq135high\" id=\"mq135high\"> <br> Low");
         http_printf(req, "<input type=\"number\" v-model=\"form.mq135low\" id=\"mq135low\"> <br><br>");
+        http_printf(req, "<label>送風排程：每 <input type=\"number\" v-model=\"form.fsInterval\" style=\"width:60px\"> 分鐘，送風 <input type=\"number\" v-model=\"form.fsRun\" style=\"width:60px\"> 分鐘</label><br>");
+        http_printf(req, "啟用排程：<input type=\"checkbox\" v-model=\"form.fsEnabled\"><br><br>");
     }
 
     http_printf(req, "<label for=\"dht22temp\">Temperature Threshold:<br> High</label>");
@@ -1721,7 +1761,10 @@ static void http_view_method(httpd_req_t *req)
         http_printf(req, "              this.mq135currentdata = data.mq135currentdata || 0;");
         http_printf(req, "              this.mq135thresholdhigh = data.mq135thresholdhigh || 0;");
         http_printf(req, "              this.mq135thresholdlow = data.mq135thresholdlow || 0;");
-        http_printf(req, "              this.deltafanscheduler = data.deltafanscheduler || 0;");        
+        http_printf(req, "              this.deltafanscheduler = data.deltafanscheduler || 0;");
+        http_printf(req, "              if(data.fsInterval !== undefined) this.fsInterval = data.fsInterval;");
+        http_printf(req, "              if(data.fsRun !== undefined) this.fsRun = data.fsRun;");
+        http_printf(req, "              if(data.fsEnabled !== undefined) this.fsEnabled = !!data.fsEnabled;");
     }
     http_printf(req, "              this.dht22currenttemp = data.dht22currenttemp || 0;");
     http_printf(req, "              this.dht22thresholdtemphigh = data.dht22thresholdtemphigh || 0;");
@@ -2114,6 +2157,8 @@ static void http_view_modle(httpd_req_t * req)
     int i = 0, temphigh = 0, templow = 0, humihigh = 0, humilow = 0;
     int mq135thresholdhigh = 0, mq135thresholdlow = 0;
     uint32_t delaytime = 0;
+    uint32_t fs_interval = 0, fs_run = 0;
+    bool fs_enabled = false;
     char orgtpapikey[THINGSPEAK_API_KEYLENGTH+1] = {0};
     uint8_t sys_mac[6];
     int leddisplaytime = 0, ledsnoozetime = 0;
@@ -2143,7 +2188,10 @@ static void http_view_modle(httpd_req_t * req)
         http_printf(req, "    mq135thresholdhigh: 0,"); /* Worst Air quality threshold */
         http_printf(req, "    mq135thresholdlow: 0,"); /* Best Air quality threshold */
         http_printf(req, "    airQualityData: [],"); /* Recently Air quality data */
-        http_printf(req, "    deltafanscheduler: [],"); /* Best Air quality threshold */
+        http_printf(req, "    deltafanscheduler: [],"); /* DeltaFan scheduler state */
+        http_printf(req, "    fsInterval: %d,", FAN_SCHEDULE_DEFAULT_INTERVAL_MIN);
+        http_printf(req, "    fsRun: %d,", FAN_SCHEDULE_DEFAULT_RUN_MIN);
+        http_printf(req, "    fsEnabled: false,");
     }
     http_printf(req, "    airQualityLabels: [],"); /* Air quality Time labels */
     http_printf(req, "    NULD2410Labels: [],"); /* Artificial Neural Network Time labels */
@@ -2227,6 +2275,10 @@ static void http_view_modle(httpd_req_t * req)
         airquality_get_voc_threshold_low(&mq135thresholdlow);
         http_printf(req, "      mq135high: \"%d\",",mq135thresholdhigh);
         http_printf(req, "      mq135low: \"%d\",",mq135thresholdlow);
+        fan_schedule_get_config(&fs_interval, &fs_run, &fs_enabled);
+        http_printf(req, "      fsInterval: %lu,", fs_interval);
+        http_printf(req, "      fsRun: %lu,", fs_run);
+        http_printf(req, "      fsEnabled: %s,", fs_enabled ? "true" : "false");
     }
     
     dht22_gethightemperature(&temphigh);

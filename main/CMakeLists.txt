@@ -22,6 +22,7 @@ set(srcs
     "thingspeak.c"
     "task_monitor.c"
     "webpages.c"
+    "fan_schedule.c"
 )
 
 if(CONFIG_SGP41_ENABLE)

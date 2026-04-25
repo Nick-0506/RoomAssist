@@ -34,9 +34,9 @@ uint8_t grmt_deltatimerBuffer[4] = {0x00, 0x0F, 0x05,
                                     0xFA}; /* Enable Delta Fan 4HR */
 uint8_t grmt_deltascheduler[IR_DELTA_FAN_TIGGER_MODE_MAX] = {
     DELTA_FAN_SCHDULER_IDEL, DELTA_FAN_SCHDULER_IDEL, DELTA_FAN_SCHDULER_IDEL,
-    DELTA_FAN_SCHDULER_IDEL, DELTA_FAN_SCHDULER_IDEL};
+    DELTA_FAN_SCHDULER_IDEL, DELTA_FAN_SCHDULER_IDEL, DELTA_FAN_SCHDULER_IDEL};
 uint8_t grmt_deltaschedulerName[IR_DELTA_FAN_TIGGER_MODE_MAX + 1][10] = {
-    "Manual", "Exhaust", "Warm", "Dry", "Homekit", "Off", "Keep"};
+    "Manual", "Exhaust", "Warm", "Dry", "Homekit", "Schedl", "Off", "Keep"};
 QueueHandle_t gqueue_rmt_tx;
 ir_hta_scan_code_t grmt_hta_data;
 ir_zro_scan_code_t grmt_zro_data;
@@ -1418,7 +1418,8 @@ int rmt_form_tx_data(rmt_msg_t *rmt_msg)
                         break;
                     case IR_DELTA_FAN_TIGGER_MODE_EXHAUST:
                     case IR_DELTA_FAN_TIGGER_MODE_HOMEKIT:
-                        /* Exhaust 1HR */
+                    case IR_DELTA_FAN_TIGGER_MODE_SCHEDULE:
+                        /* Exhaust max */
                         grmt_deltaBuffer[2] = DELTA_FAN_MODE_EXHAUST_MAX;
                         grmt_deltaBuffer[3] = ~DELTA_FAN_MODE_EXHAUST_MAX;
                         rmt_setmanualfanstatus(true);
