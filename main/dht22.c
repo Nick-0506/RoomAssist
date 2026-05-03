@@ -484,7 +484,9 @@ void dht22_saveconfig(char *key, int32_t data)
     ret = nvs_set_i32(nvs_handle, key, value1);
     if (ret != ESP_OK) {
         syslog_handler(SYSLOG_FACILITY_TEMPERATURE, SYSLOG_LEVEL_ERROR,"NVS set failed for key: %s", esp_err_to_name(ret));
-    }    
+    } else {
+        nvs_commit(nvs_handle);
+    }
     nvs_close(nvs_handle);
     syslog_handler(SYSLOG_FACILITY_TEMPERATURE, SYSLOG_LEVEL_INFO,"Config saved %s %d", key, data);
     return;

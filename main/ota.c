@@ -338,6 +338,8 @@ void ota_saveconfig(char *key, char *str) {
   ret = nvs_set_str(nvs_handle, key, str);
   if (ret != ESP_OK) {
     ESP_LOGE(TAG_NVS, "NVS set failed for key1: %s", esp_err_to_name(ret));
+  } else {
+    nvs_commit(nvs_handle);
   }
   nvs_close(nvs_handle);
   syslog_handler(SYSLOG_FACILITY_OTA, SYSLOG_LEVEL_INFO, "Config saved %s",
@@ -585,6 +587,7 @@ void task_ota(void *pvParameter) {
       ret = nvs_open(OTA_NVS_NAMESPACE, NVS_READWRITE, &nvs_handle);
       if (ret == ESP_OK) {
         nvs_set_u8(nvs_handle, OTA_NVS_STATUS_KEY, gota_status);
+        nvs_commit(nvs_handle);
         nvs_close(nvs_handle);
       }
       system_task_created(TASK_OTA_ID); /* OTA complete */

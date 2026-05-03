@@ -243,7 +243,9 @@ void syslog_saveconfig(char *key, char *serverip)
     ret = nvs_set_str(nvs_handle, key, serverip);
     if (ret != ESP_OK) {
         syslog_handler(SYSLOG_FACILITY_SYSLOG,SYSLOG_LEVEL_ERROR,"NVS set failed for key %s error %s",key,esp_err_to_name(ret));
-    }    
+    } else {
+        nvs_commit(nvs_handle);
+    }
     nvs_close(nvs_handle);
 
     f = fopen(SYSLOG_CFG_PATH, "wb");

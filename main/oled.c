@@ -777,6 +777,10 @@ void oled_saveconfig(char *key, int32_t data)
   {
     ESP_LOGE(TAG_NVS, "NVS set failed for key1: %s", esp_err_to_name(ret));
   }
+  else
+  {
+    nvs_commit(nvs_handle);
+  }
   nvs_close(nvs_handle);
   syslog_handler(SYSLOG_FACILITY_OLED, SYSLOG_LEVEL_INFO, "Config saved %s %d",
                  key, data);

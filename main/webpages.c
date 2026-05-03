@@ -155,6 +155,7 @@ esp_err_t fetch_vue(httpd_req_t *req)
                         {
                             nvs_set_u8(nvs_handle, OTA_NVS_STATUS_KEY,
                                        ota_status);
+                            nvs_commit(nvs_handle);
                             nvs_close(nvs_handle);
                         }
                         system_task_creating(TASK_OTA_ID);

@@ -177,6 +177,10 @@ void thingspeak_saveconfig(void)
     syslog_handler(SYSLOG_FACILITY_THINGSPEAK, SYSLOG_LEVEL_ERROR,
                    "Set API KEY fail");
   }
+  else
+  {
+    nvs_commit(nvs_handle);
+  }
 
   nvs_close(nvs_handle);
   syslog_handler(SYSLOG_FACILITY_THINGSPEAK, SYSLOG_LEVEL_INFO,
