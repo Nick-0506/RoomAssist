@@ -261,6 +261,10 @@ void task_oled(void *pvParameter)
     {
       oled_setDisplayMode(LED_DISPLAY_MODE_HOMEKIT_PAIR);
     }
+    else if (orileddisplaymode == LED_DISPLAY_MODE_HOMEKIT_PAIR)
+    {
+      oled_setDisplayMode(LED_DISPLAY_MODE_TIME);
+    }
     if (xSemaphoreTake(gsemaLED, portMAX_DELAY) == pdTRUE)
     {
       ota_getstatus(&ota_status);
