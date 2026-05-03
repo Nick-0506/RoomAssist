@@ -241,7 +241,9 @@ void ac_saveconfig(char *key, int value)
     ret = nvs_set_u32(nvs_handle, key, (uint32_t) value);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG_NVS, "NVS set failed for key1: %s", esp_err_to_name(ret));
-    }    
+    } else {
+        nvs_commit(nvs_handle);
+    }
     nvs_close(nvs_handle);
     syslog_handler(SYSLOG_FACILITY_HOMEKIT, SYSLOG_LEVEL_INFO,"Config saved %s %d",key,value);
     return;
@@ -1041,7 +1043,9 @@ void zerofan_saveconfig(char *key, int value)
     ret = nvs_set_u32(nvs_handle, key, (uint32_t) value);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG_NVS, "NVS set failed for key1: %s", esp_err_to_name(ret));
-    }    
+    } else {
+        nvs_commit(nvs_handle);
+    }
     nvs_close(nvs_handle);
     syslog_handler(SYSLOG_FACILITY_HOMEKIT, SYSLOG_LEVEL_INFO,"Config saved %s %d",key,value);
     return;
@@ -1061,7 +1065,9 @@ void deltafan_saveconfig(char *key, int value)
     ret = nvs_set_u32(nvs_handle, key, (uint32_t) value);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG_NVS, "NVS set failed for key1: %s", esp_err_to_name(ret));
-    }    
+    } else {
+        nvs_commit(nvs_handle);
+    }
     nvs_close(nvs_handle);
     syslog_handler(SYSLOG_FACILITY_HOMEKIT, SYSLOG_LEVEL_INFO,"Config saved %s %d",key,value);
     return;
@@ -1081,7 +1087,9 @@ void elf_saveconfig(char *key, int value)
     ret = nvs_set_u32(nvs_handle, key, (uint32_t) value);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG_NVS, "NVS set failed for key1: %s", esp_err_to_name(ret));
-    }    
+    } else {
+        nvs_commit(nvs_handle);
+    }
     nvs_close(nvs_handle);
     return;
 }

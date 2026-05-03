@@ -87,9 +87,23 @@ void app_main()
   esp_task_wdt_add(NULL);
 
   // Initialize NVS
+  // ESP_ERR_NVS_NO_FREE_PAGES: erase only non-HAP namespaces to preserve HomeKit pairing
+  // ESP_ERR_NVS_NEW_VERSION_FOUND: full erase is unavoidable
   ret = nvs_flash_init();
-  if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
+  if (ret == ESP_ERR_NVS_NO_FREE_PAGES)
   {
+    ESP_LOGW("NVS", "NVS no free pages, erasing non-HAP data");
+    nvs_handle_t h;
+    if (nvs_open("ACCFG",       NVS_READWRITE, &h) == ESP_OK) { nvs_erase_all(h); nvs_commit(h); nvs_close(h); }
+    if (nvs_open("ZEROFANCFG",  NVS_READWRITE, &h) == ESP_OK) { nvs_erase_all(h); nvs_commit(h); nvs_close(h); }
+    if (nvs_open("DELTAFANCFG", NVS_READWRITE, &h) == ESP_OK) { nvs_erase_all(h); nvs_commit(h); nvs_close(h); }
+    if (nvs_open("ELFCFG",      NVS_READWRITE, &h) == ESP_OK) { nvs_erase_all(h); nvs_commit(h); nvs_close(h); }
+    if (nvs_open("fan_sched",   NVS_READWRITE, &h) == ESP_OK) { nvs_erase_all(h); nvs_commit(h); nvs_close(h); }
+    ret = nvs_flash_init();
+  }
+  if (ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
+  {
+    ESP_LOGW("NVS", "NVS new version found, full erase required");
     ESP_ERROR_CHECK(nvs_flash_erase());
     ret = nvs_flash_init();
   }
